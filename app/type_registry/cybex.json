@@ -1,0 +1,78 @@
+{
+    "default": {
+        "Price": "u128",
+        "Token": {
+            "type": "struct",
+            "type_mapping": [
+                ["hash", "H256"],
+                ["symbol", "Vec<u8>"],
+                ["total_supply", "Balance"]
+            ]
+        },
+        "OrderType": {
+            "type": "enum",
+            "value_list": ["Buy", "Sell"]
+        },
+        "OrderStatus": {
+            "type": "enum",
+            "value_list": ["Created", "PartialFilled", "Filled", "Canceled"]
+        },
+        "TradePair": {
+            "type": "struct",
+            "type_mapping": [
+                ["hash", "H256"],
+                ["base", "H256"],
+                ["quote", "H256"],
+                ["latest_matched_price", "Option<Price>"],
+                ["one_day_trade_volume", "Balance"],
+                ["one_day_highest_price", "Option<Price>"],
+                ["one_day_lowest_price", "Option<Price>"]
+            ]
+        },
+
+        "LimitOrder": {
+            "type": "struct",
+            "type_mapping": [
+                ["hash", "H256"],
+                ["base", "H256"],
+                ["quote", "H256"],
+                ["owner", "AccountId"],
+                ["price", "Price"],
+                ["sell_amount", "Balance"],
+                ["buy_amount", "Balance"],
+                ["remained_sell_amount", "Balance"],
+                ["remained_buy_amount", "Balance"],
+                ["otype", "OrderType"],
+                ["status", "OrderStatus"]
+            ]
+        },
+        "Trade": {
+            "type": "struct",
+            "type_mapping": [
+                ["hash", "H256"],
+                ["base", "H256"],
+                ["quote", "H256"],
+                ["buyer", "AccountId"],
+                ["seller", "AccountId"],
+                ["maker", "AccountId"],
+                ["taker", "AccountId"],
+                ["otype", "OrderType"],
+                ["price", "Price"],
+                ["base_amount", "Balance"],
+                ["quote_amount", "Balance"]
+            ]
+        },
+        "OrderLinkedItem": {
+            "type": "struct",
+            "type_mapping": [
+                ["prev", "Option<Price>"],
+                ["next", "Option<Price>"],
+                ["price", "Option<Price>"],
+                ["buy_amount", "Balance"],
+                ["sell_amount", "Balance"],
+                ["orders", "Vec<H256>"]
+            ]
+        }
+    }
+}
+

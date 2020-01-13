@@ -1162,3 +1162,33 @@ class CodeStoredEventProcessor(EventProcessor):
     def accumulation_revert(self, db_session):
         for item in Contract.query(db_session).filter_by(created_at_block=self.block.id):
             db_session.delete(item)
+
+
+class TradeEventProcessor(EventProcessor):
+
+    module_id = 'tradeModule'
+    event_id = 'TradeCreated'
+
+    def accumulation_hook(self, db_session):
+        trade = Trade(
+            trade_hash = self.event.attributes[3]['valueRaw'],
+            block_id = self.event.block_id,
+            extrinsic_idx = self.event.extrinsic_idx,
+            event_idx = self.event.event_idx,
+            base = self.event.attributes[1]['valueRaw'],
+            quote = self.event.attributes[2]['valueRaw'],
+            buyer = self.event.attributes[4]['value']['buyer'],
+            seller = self.event.attributes[4]['value']['seller'],
+            maker = self.event.attributes[4]['value']['maker'],
+            taker = self.event.attributes[4]['value']['taker'],
+            otype = self.event.attributes[4]['value']['otype'],
+            price = self.event.attributes[4]['value']['price'],
+            base_amount = self.event.attributes[4]['value']['base_amount'],
+            quote_amount = self.event.attributes[4]['value']['quote_amount']
+        )
+
+        trade.save(db_session)
+
+    def accumulation_revert(self, db_session):
+        for item in Trade.query(db_session).filter_by(block_id=self.block.id):
+            db_session.delete(item)

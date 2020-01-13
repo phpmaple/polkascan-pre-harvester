@@ -859,3 +859,75 @@ class ReorgLog(BaseModel):
 
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.log_idx)
+
+class Trade(BaseModel):
+    __tablename__ = 'data_trade'
+    __table_args__ = (sa.Index('ix_data_trade_block_id_base_quote','block_id', 'base', 'quote'),)
+
+    trade_hash = sa.Column(sa.String(66), primary_key=True, nullable=False)
+    block_id = sa.Column(sa.Integer())
+    extrinsic_idx = sa.Column(sa.Integer())
+    event_idx = sa.Column(sa.Integer())
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
+    buyer = sa.Column(sa.String(64), nullable=False)
+    seller = sa.Column(sa.String(64), nullable=False)
+    maker = sa.Column(sa.String(64), nullable=False)
+    taker = sa.Column(sa.String(64), nullable=False)
+    otype = sa.Column(sa.SmallInteger(), nullable=False)
+    price = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+    def serialize_id(self):
+        return '{}'.format(self.trade_hash)
+
+
+class MarketHistory_1m(BaseModel):
+    __tablename__ = 'data_market_history_1m'
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    time = sa.Column(sa.DateTime(timezone=True), primary_key=True, nullable = False)
+    open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+
+class MarketHistory_5m(BaseModel):
+    __tablename__ = 'data_market_history_5m'
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+class MarketHistory_1h(BaseModel):
+    __tablename__ = 'data_market_history_1h'
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+class MarketHistory_1d(BaseModel):
+    __tablename__ = 'data_market_history_1d'
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
