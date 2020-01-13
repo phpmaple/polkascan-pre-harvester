@@ -23,7 +23,7 @@ from packaging import version
 from app.models.data import Account, AccountIndex, DemocracyProposal, Contract, Session, AccountAudit, \
     AccountIndexAudit, DemocracyProposalAudit, SessionTotal, SessionValidator, DemocracyReferendumAudit, RuntimeStorage, \
     SessionNominator, RuntimeCall, CouncilMotionAudit, CouncilVoteAudit, TechCommProposalAudit, \
-    TechCommProposalVoteAudit, TreasuryProposalAudit
+    TechCommProposalVoteAudit, TreasuryProposalAudit, Trade
 from app.processors.base import EventProcessor
 from app.settings import ACCOUNT_AUDIT_TYPE_NEW, ACCOUNT_AUDIT_TYPE_REAPED, ACCOUNT_INDEX_AUDIT_TYPE_NEW, \
     ACCOUNT_INDEX_AUDIT_TYPE_REAPED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_PROPOSED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_TABLED, \
@@ -1166,7 +1166,7 @@ class CodeStoredEventProcessor(EventProcessor):
 
 class TradeEventProcessor(EventProcessor):
 
-    module_id = 'tradeModule'
+    module_id = 'trademodule'
     event_id = 'TradeCreated'
 
     def accumulation_hook(self, db_session):
