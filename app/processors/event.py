@@ -1181,7 +1181,7 @@ class TradeEventProcessor(EventProcessor):
             seller = self.event.attributes[4]['value']['seller'].replace('0x', ''),
             maker = self.event.attributes[4]['value']['maker'].replace('0x', ''),
             taker = self.event.attributes[4]['value']['taker'].replace('0x', ''),
-            otype = self.event.attributes[4]['value']['otype'],
+            otype = 0 if self.event.attributes[4]['value']['otype'] == "Buy" else 1,
             price = self.event.attributes[4]['value']['price'],
             base_amount = self.event.attributes[4]['value']['base_amount'],
             quote_amount = self.event.attributes[4]['value']['quote_amount']
