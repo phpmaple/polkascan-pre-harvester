@@ -59,8 +59,10 @@ class BaseTask(celery.Task):
         self.metadata_store = {}
 
     def __call__(self, *args, **kwargs):
-        self.engine = create_engine(DB_CONNECTION, echo=DEBUG, isolation_level="READ_UNCOMMITTED")
-        session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+        self.engine = create_engine(
+            DB_CONNECTION, echo=DEBUG, isolation_level="READ_UNCOMMITTED")
+        session_factory = sessionmaker(
+            bind=self.engine, autoflush=False, autocommit=False)
         self.session = scoped_session(session_factory)
 
         return super().__call__(*args, **kwargs)
@@ -75,7 +77,8 @@ class BaseTask(celery.Task):
 @app.task(base=BaseTask, bind=True)
 def accumulate_block_recursive(self, block_hash, end_block_hash=None):
 
-    harvester = PolkascanHarvesterService(self.session, type_registry=TYPE_REGISTRY)
+    harvester = PolkascanHarvesterService(
+        self.session, type_registry=TYPE_REGISTRY)
     harvester.metadata_store = self.metadata_store
 
     # If metadata store isn't initialized yet, perform some tests
@@ -141,7 +144,8 @@ def accumulate_block_recursive(self, block_hash, end_block_hash=None):
 
 @app.task(base=BaseTask, bind=True)
 def calculate_market_history(self):
-    
+    pass
+
 
 @app.task(base=BaseTask, bind=True)
 def start_sequencer(self):
@@ -157,7 +161,8 @@ def start_sequencer(self):
         sequencer_task.value = self.request.id
         sequencer_task.save(self.session)
 
-        harvester = PolkascanHarvesterService(self.session, type_registry=TYPE_REGISTRY)
+        harvester = PolkascanHarvesterService(
+            self.session, type_registry=TYPE_REGISTRY)
         try:
             result = harvester.start_sequencer()
         except BlockIntegrityError as e:
@@ -187,8 +192,10 @@ def start_harvester(self, check_gaps=False):
         for block_set in remaining_sets_result:
 
             # Get start and end block hash
-            end_block_hash = substrate.get_block_hash(int(block_set['block_from']))
-            start_block_hash = substrate.get_block_hash(int(block_set['block_to']))
+            end_block_hash = substrate.get_block_hash(
+                int(block_set['block_from']))
+            start_block_hash = substrate.get_block_hash(
+                int(block_set['block_to']))
 
             # Start processing task
             accumulate_block_recursive.delay(start_block_hash, end_block_hash)
