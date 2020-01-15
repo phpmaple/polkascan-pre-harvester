@@ -140,6 +140,10 @@ def accumulate_block_recursive(self, block_hash, end_block_hash=None):
 
 
 @app.task(base=BaseTask, bind=True)
+def calculate_market_history(self):
+    
+
+@app.task(base=BaseTask, bind=True)
 def start_sequencer(self):
     sequencer_task = Status.get_status(self.session, 'SEQUENCER_TASK_ID')
 

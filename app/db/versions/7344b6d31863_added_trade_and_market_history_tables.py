@@ -1,8 +1,8 @@
 """Added trade and market history tables
 
-Revision ID: be55db5b1f38
+Revision ID: 7344b6d31863
 Revises: 8712ff01cb11
-Create Date: 2020-01-13 15:28:56.721938
+Create Date: 2020-01-15 17:12:24.863617
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'be55db5b1f38'
+revision = '7344b6d31863'
 down_revision = '8712ff01cb11'
 branch_labels = None
 depends_on = None
@@ -49,7 +49,7 @@ def upgrade():
     sa.Column('close', sa.Numeric(precision=65, scale=0), nullable=False),
     sa.Column('base_amount', sa.Numeric(precision=65, scale=0), nullable=False),
     sa.Column('quote_amount', sa.Numeric(precision=65, scale=0), nullable=False),
-    sa.PrimaryKeyConstraint('id', 'time')
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('data_market_history_5m',
     sa.Column('id', sa.Integer(), nullable=False),

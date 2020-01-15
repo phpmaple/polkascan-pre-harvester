@@ -887,7 +887,7 @@ class MarketHistory_1m(BaseModel):
     __tablename__ = 'data_market_history_1m'
 
     id = sa.Column(sa.Integer(), primary_key=True)
-    time = sa.Column(sa.DateTime(timezone=True), primary_key=True, nullable = False)
+    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
     open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
