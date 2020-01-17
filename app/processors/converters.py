@@ -680,7 +680,7 @@ class PolkascanHarvesterService(BaseService):
                 era=extrinsic_data.get('era'),
                 call=extrinsic_data.get('call_code'),
                 module_id=extrinsic_data.get('call_module'),
-                call_id=extrinsic_data.get('call_module_function'),
+                call_id=extrinsic_data.get('call_function'),
                 params=extrinsic_data.get('params'),
                 spec_version_id=parent_spec_version,
                 success=int(extrinsic_success),
