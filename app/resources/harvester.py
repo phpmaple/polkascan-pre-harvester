@@ -281,7 +281,7 @@ class MarketHistoryResource(BaseResource):
             resp.status = falcon.HTTP_BAD_REQUEST
         elif req.params.get("interval") in ["1m", "5m", "1h", "1d"]:
             limit = req.params.get("limit") if req.params.get("limit") else 200
-            limit = min(200, limit)
+            limit = min(200, int(limit))
 
             result = []
             if req.params.get("interval") == "1m":
