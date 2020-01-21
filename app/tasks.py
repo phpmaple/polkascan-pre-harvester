@@ -37,8 +37,8 @@ from substrateinterface import SubstrateInterface
 
 from app.settings import DB_CONNECTION, DEBUG, SUBSTRATE_RPC_URL, TYPE_REGISTRY, FINALIZATION_ONLY
 
-CELERY_BROKER = os.environ.get('CELERY_BROKER')
-CELERY_BACKEND = os.environ.get('CELERY_BACKEND')
+CELERY_BROKER = os.environ.get('CELERY_BROKER', "redis://redis:6379/0")
+CELERY_BACKEND = os.environ.get('CELERY_BACKEND', "redis://redis:6379/0")
 
 app = celery.Celery('tasks', broker=CELERY_BROKER, backend=CELERY_BACKEND)
 
@@ -150,7 +150,6 @@ def calculate_market_history(self):
 @app.task(base=BaseTask, bind=True)
 def start_sequencer(self):
     sequencer_task = Status.get_status(self.session, 'SEQUENCER_TASK_ID')
-
     if sequencer_task.value:
         task_result = AsyncResult(sequencer_task.value)
         if not task_result or task_result.ready():
@@ -158,6 +157,7 @@ def start_sequencer(self):
             sequencer_task.save(self.session)
 
     if sequencer_task.value is None:
+
         sequencer_task.value = self.request.id
         sequencer_task.save(self.session)
 

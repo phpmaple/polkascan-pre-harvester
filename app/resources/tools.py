@@ -143,3 +143,27 @@ class StorageValidatorResource(BaseResource):
         resp.media = {'validators': validators, 'current_era': current_era}
 
 
+class ResetMarketResource(BaseResource):
+    def on_post(self, req, resp):
+        self.session.execute('''TRUNCATE TABLE data_block_total''')
+        self.session.execute('''TRUNCATE TABLE data_market_history_1m''')
+        self.session.execute('''TRUNCATE TABLE data_market_history_5m''')
+        self.session.execute('''TRUNCATE TABLE data_market_history_1h''')
+        self.session.execute('''TRUNCATE TABLE data_market_history_1d''')
+
+        self.session.execute('''TRUNCATE TABLE data_session''')
+        self.session.execute('''TRUNCATE TABLE data_session_total''')
+
+        sequencer_task = Status.get_status(
+            self.session, 'SEQUENCER_TASK_ID')
+
+        sequencer_task.value = None
+        sequencer_task.save(self.session)
+        self.session.commit()
+
+        resp.media = {
+            'status': 'success',
+            'data': {
+                'message': ''
+            }
+        }

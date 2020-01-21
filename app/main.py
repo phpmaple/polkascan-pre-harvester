@@ -30,16 +30,18 @@ from app.middleware.sessionmanager import SQLAlchemySessionManager
 
 from app.resources.harvester import PolkascanStartHarvesterResource, PolkascanStopHarvesterResource, \
     PolkascanStatusHarvesterResource, PolkascanProcessBlockResource, \
-    PolkaScanCheckHarvesterTaskResource, SequenceBlockResource, StartSequenceBlockResource, StartIntegrityResource
+    PolkaScanCheckHarvesterTaskResource, SequenceBlockResource, StartSequenceBlockResource, StartIntegrityResource, MarketHistoryResource
 from app.resources.tools import ExtractMetadataResource, ExtractExtrinsicsResource, \
-    HealthCheckResource, ExtractEventsResource
+    HealthCheckResource, ExtractEventsResource, ResetMarketResource
 
 # Database connection
-engine = create_engine(DB_CONNECTION, echo=DEBUG, isolation_level="READ_UNCOMMITTED")
+engine = create_engine(DB_CONNECTION, echo=DEBUG,
+                       isolation_level="READ_UNCOMMITTED")
 session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # Define application
-app = falcon.API(middleware=[ContextMiddleware(), SQLAlchemySessionManager(session_factory)])
+app = falcon.API(middleware=[ContextMiddleware(),
+                             SQLAlchemySessionManager(session_factory)])
 
 # Application routes
 app.add_route('/healthcheck', HealthCheckResource())
@@ -49,6 +51,8 @@ app.add_route('/stop', PolkascanStopHarvesterResource())
 app.add_route('/status', PolkascanStatusHarvesterResource())
 app.add_route('/process', PolkascanProcessBlockResource())
 app.add_route('/sequence', SequenceBlockResource())
+app.add_route('/market', MarketHistoryResource())
+
 app.add_route('/sequencer/start', StartSequenceBlockResource())
 app.add_route('/integrity-check', StartIntegrityResource())
 app.add_route('/task/result/{task_id}', PolkaScanCheckHarvesterTaskResource())
@@ -56,3 +60,4 @@ app.add_route('/task/result/{task_id}', PolkaScanCheckHarvesterTaskResource())
 app.add_route('/tools/metadata/extract', ExtractMetadataResource())
 app.add_route('/tools/extrinsics/extract', ExtractExtrinsicsResource())
 app.add_route('/tools/events/extract', ExtractEventsResource())
+app.add_route('/tools/market/reset', ResetMarketResource())

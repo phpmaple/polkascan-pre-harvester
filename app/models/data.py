@@ -885,6 +885,9 @@ class Trade(BaseModel):
 
 class MarketHistory_1m(BaseModel):
     __tablename__ = 'data_market_history_1m'
+    __table_args__ = (
+        sa.Index('ix_data_market_history_1m_base_quote', 'base', 'quote'),)
+    serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
     time = sa.Column(sa.DateTime(timezone=True), nullable = False)
@@ -894,10 +897,13 @@ class MarketHistory_1m(BaseModel):
     close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
 
 class MarketHistory_5m(BaseModel):
     __tablename__ = 'data_market_history_5m'
+    __table_args__ = (sa.Index('ix_data_market_history_5m_base_quote', 'base', 'quote'),)
+    serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
     time = sa.Column(sa.DateTime(timezone=True), nullable = False)
@@ -907,9 +913,14 @@ class MarketHistory_5m(BaseModel):
     close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
 
 class MarketHistory_1h(BaseModel):
     __tablename__ = 'data_market_history_1h'
+    __table_args__ = (
+        sa.Index('ix_data_market_history_1h_base_quote', 'base', 'quote'),)
+    serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
     time = sa.Column(sa.DateTime(timezone=True), nullable = False)
@@ -919,9 +930,14 @@ class MarketHistory_1h(BaseModel):
     close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
 
 class MarketHistory_1d(BaseModel):
     __tablename__ = 'data_market_history_1d'
+    __table_args__ = (
+        sa.Index('ix_data_market_history_1d_base_quote', 'base', 'quote'),)
+    serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
     time = sa.Column(sa.DateTime(timezone=True), nullable = False)
@@ -931,3 +947,5 @@ class MarketHistory_1d(BaseModel):
     close = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
