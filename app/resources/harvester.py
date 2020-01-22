@@ -286,16 +286,16 @@ class MarketHistoryResource(BaseResource):
             result = []
             if req.params.get("interval") == "1m":
                 result = MarketHistory_1m.query(
-                    self.session).filter(MarketHistory_1m.base == req.params.get("base"), MarketHistory_1m.quote == req.params.get("quote"), MarketHistory_1m.time <= req.params.get("time")).order_by(MarketHistory_1m.id.asc()).limit(limit).all()
+                    self.session).filter(MarketHistory_1m.base == req.params.get("base"), MarketHistory_1m.quote == req.params.get("quote"), MarketHistory_1m.time <= req.params.get("time")).order_by(MarketHistory_1m.id.desc()).limit(limit).all()
             elif req.params.get("interval") == "5m":
                 result = MarketHistory_5m.query(
-                    self.session).filter(MarketHistory_5m.base == req.params.get("base"), MarketHistory_5m.quote == req.params.get("quote"), MarketHistory_5m.time <= req.params.get("time")).order_by(MarketHistory_5m.id.asc()).limit(limit).all()
+                    self.session).filter(MarketHistory_5m.base == req.params.get("base"), MarketHistory_5m.quote == req.params.get("quote"), MarketHistory_5m.time <= req.params.get("time")).order_by(MarketHistory_5m.id.desc()).limit(limit).all()
             elif req.params.get("interval") == "1h":
                 result = MarketHistory_1h.query(
-                    self.session).filter(MarketHistory_1h.base == req.params.get("base"), MarketHistory_1h.quote == req.params.get("quote"), MarketHistory_1h.time <= req.params.get("time")).order_by(MarketHistory_1h.id.asc()).limit(limit).all()
+                    self.session).filter(MarketHistory_1h.base == req.params.get("base"), MarketHistory_1h.quote == req.params.get("quote"), MarketHistory_1h.time <= req.params.get("time")).order_by(MarketHistory_1h.id.desc()).limit(limit).all()
             elif req.params.get("interval") == "1d":
                 result = MarketHistory_1d.query(
-                    self.session).filter(MarketHistory_1d.base == req.params.get("base"), MarketHistory_1d.quote == req.params.get("quote"), MarketHistory_1d.time <= req.params.get("time")).order_by(MarketHistory_1d.id.asc()).limit(limit).all()
+                    self.session).filter(MarketHistory_1d.base == req.params.get("base"), MarketHistory_1d.quote == req.params.get("quote"), MarketHistory_1d.time <= req.params.get("time")).order_by(MarketHistory_1d.id.desc()).limit(limit).all()
             resp.media = self.seri(result)
         else:
             resp.status = falcon.HTTP_BAD_REQUEST
