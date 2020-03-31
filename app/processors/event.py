@@ -23,7 +23,7 @@ from packaging import version
 from app.models.data import Account, AccountIndex, DemocracyProposal, Contract, Session, AccountAudit, \
     AccountIndexAudit, DemocracyProposalAudit, SessionTotal, SessionValidator, DemocracyReferendumAudit, RuntimeStorage, \
     SessionNominator, RuntimeCall, CouncilMotionAudit, CouncilVoteAudit, TechCommProposalAudit, \
-    TechCommProposalVoteAudit, TreasuryProposalAudit, Trade
+    TechCommProposalVoteAudit, TreasuryProposalAudit, Trade, Orders
 from app.processors.base import EventProcessor
 from app.settings import ACCOUNT_AUDIT_TYPE_NEW, ACCOUNT_AUDIT_TYPE_REAPED, ACCOUNT_INDEX_AUDIT_TYPE_NEW, \
     ACCOUNT_INDEX_AUDIT_TYPE_REAPED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_PROPOSED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_TABLED, \
@@ -1191,4 +1191,31 @@ class TradeEventProcessor(EventProcessor):
 
     def accumulation_revert(self, db_session):
         for item in Trade.query(db_session).filter_by(block_id=self.block.id):
+            db_session.delete(item)
+
+
+class OrderEventProcessor(EventProcessor):
+
+    module_id = 'trademodule'
+    event_id = 'OrderCreated'
+
+    def accumulation_hook(self, db_session):
+        trade = Orders(
+            order_hash=self.event.attributes[3]['valueRaw'],
+            block_id=self.event.block_id,
+            extrinsic_idx=self.event.extrinsic_idx,
+            event_idx=self.event.event_idx,
+            base=self.event.attributes[1]['valueRaw'],
+            quote=self.event.attributes[2]['valueRaw'],
+            owner=self.event.attributes[4]['value']['owner'].replace('0x', ''),
+            otype=0 if self.event.attributes[4]['value']['otype'] == "Buy" else 1,
+            price=self.event.attributes[4]['value']['price'],
+            buy_amount=self.event.attributes[4]['value']['buy_amount'],
+            sell_amount=self.event.attributes[4]['value']['sell_amount']
+        )
+
+        trade.save(db_session)
+
+    def accumulation_revert(self, db_session):
+        for item in Orders.query(db_session).filter_by(block_id=self.block.id):
             db_session.delete(item)

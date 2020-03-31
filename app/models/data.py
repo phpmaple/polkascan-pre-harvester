@@ -122,32 +122,50 @@ class BlockTotal(BaseModel):
     parent_datetime = sa.Column(sa.DateTime())
     blocktime = sa.Column(sa.Integer(), nullable=False)
     author = sa.Column(sa.String(64), nullable=True)
-    total_extrinsics = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_success = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_error = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_signed = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_unsigned = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_signedby_address = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_extrinsics_signedby_index = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_extrinsics_success = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics_error = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics_signed = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics_unsigned = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics_signedby_address = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_extrinsics_signedby_index = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
     total_events = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_events_system = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_events_module = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_events_extrinsic = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_events_finalization = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    total_events_system = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_events_module = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_events_extrinsic = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_events_finalization = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
     total_logs = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_blocktime = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_accounts = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_accounts_new = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_accounts_reaped = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_sessions_new = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    total_contracts_new = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    total_blocktime = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_accounts = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_accounts_new = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_accounts_reaped = sa.Column(
+        sa.Numeric(precision=65, scale=0), nullable=False)
+    total_sessions_new = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
+    total_contracts_new = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=False)
 
 
 class Event(BaseModel):
     __tablename__ = 'data_event'
 
     block_id = sa.Column(sa.Integer(), primary_key=True, index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
+    block = relationship(Block, foreign_keys=[
+                         block_id], primaryjoin=block_id == Block.id)
 
     event_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
 
@@ -176,7 +194,8 @@ class Extrinsic(BaseModel):
     __tablename__ = 'data_extrinsic'
 
     block_id = sa.Column(sa.Integer(), primary_key=True, index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
+    block = relationship(Block, foreign_keys=[
+                         block_id], primaryjoin=block_id == Block.id)
 
     extrinsic_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
     extrinsic_hash = sa.Column(sa.String(64), index=True, nullable=True)
@@ -248,7 +267,8 @@ class AccountAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class Session(BaseModel):
@@ -277,7 +297,8 @@ class SessionValidator(BaseModel):
     __tablename__ = 'data_session_validator'
 
     session_id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    rank_validator = sa.Column(sa.Integer(), primary_key=True, autoincrement=False, index=True)
+    rank_validator = sa.Column(
+        sa.Integer(), primary_key=True, autoincrement=False, index=True)
     validator_stash = sa.Column(sa.String(64), index=True)
     validator_controller = sa.Column(sa.String(64), index=True)
     validator_session = sa.Column(sa.String(64), index=True)
@@ -285,7 +306,8 @@ class SessionValidator(BaseModel):
     bonded_active = sa.Column(sa.Numeric(precision=65, scale=0))
     bonded_nominators = sa.Column(sa.Numeric(precision=65, scale=0))
     bonded_own = sa.Column(sa.Numeric(precision=65, scale=0))
-    unlocking = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    unlocking = sa.Column(sa.JSON(), default=None,
+                          server_default=None, nullable=True)
     count_nominators = sa.Column(sa.Integer(), nullable=True)
     unstake_threshold = sa.Column(sa.Integer(), nullable=True)
     commission = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
@@ -295,8 +317,10 @@ class SessionNominator(BaseModel):
     __tablename__ = 'data_session_nominator'
 
     session_id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    rank_validator = sa.Column(sa.Integer(), primary_key=True, autoincrement=False, index=True)
-    rank_nominator = sa.Column(sa.Integer(), primary_key=True, autoincrement=False, index=True)
+    rank_validator = sa.Column(
+        sa.Integer(), primary_key=True, autoincrement=False, index=True)
+    rank_nominator = sa.Column(
+        sa.Integer(), primary_key=True, autoincrement=False, index=True)
     nominator_stash = sa.Column(sa.String(64), index=True)
     nominator_controller = sa.Column(sa.String(64), index=True, nullable=True)
     bonded = sa.Column(sa.Numeric(precision=65, scale=0))
@@ -324,14 +348,16 @@ class AccountIndexAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class DemocracyProposal(BaseModel):
     __tablename__ = 'data_democracy_proposal'
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    proposal = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    proposal = sa.Column(sa.JSON(), default=None,
+                         server_default=None, nullable=True)
     bond = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     created_at_block = sa.Column(sa.Integer(), nullable=False)
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
@@ -347,7 +373,8 @@ class DemocracyProposalAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class DemocracyReferendum(BaseModel):
@@ -355,7 +382,8 @@ class DemocracyReferendum(BaseModel):
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
     proposal_id = sa.Column(sa.Integer(), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    proposal = sa.Column(sa.JSON(), default=None,
+                         server_default=None, nullable=True)
     vote_threshold = sa.Column(sa.String(64))
     success = sa.Column(sa.Boolean(), nullable=True)
     created_at_block = sa.Column(sa.Integer(), nullable=False)
@@ -367,19 +395,22 @@ class DemocracyReferendumAudit(BaseModel):
     __tablename__ = 'data_democracy_referendum_audit'
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(sa.Integer(), nullable=False, index=True)
+    democracy_referendum_id = sa.Column(
+        sa.Integer(), nullable=False, index=True)
     block_id = sa.Column(sa.Integer(), index=True, nullable=False)
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class DemocracyVote(BaseModel):
     __tablename__ = 'data_democracy_vote'
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(sa.Integer(), nullable=True, index=True)
+    democracy_referendum_id = sa.Column(
+        sa.Integer(), nullable=True, index=True)
     vote_account_id = sa.Column(sa.String(64), index=True, nullable=True)
     stash_account_id = sa.Column(sa.String(64), index=True, nullable=True)
     vote_raw = sa.Column(sa.Integer(), nullable=True)
@@ -387,8 +418,10 @@ class DemocracyVote(BaseModel):
     vote_no = sa.Column(sa.Boolean(), nullable=True)
     stash = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
     conviction = sa.Column(sa.Integer(), nullable=True)
-    vote_yes_weighted = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
-    vote_no_weighted = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
+    vote_yes_weighted = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=True)
+    vote_no_weighted = sa.Column(sa.Numeric(
+        precision=65, scale=0), nullable=True)
     created_at_block = sa.Column(sa.Integer(), nullable=False)
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
@@ -397,12 +430,14 @@ class DemocracyVoteAudit(BaseModel):
     __tablename__ = 'data_democracy_vote_audit'
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(sa.Integer(), nullable=False, index=True)
+    democracy_referendum_id = sa.Column(
+        sa.Integer(), nullable=False, index=True)
     block_id = sa.Column(sa.Integer(), index=True, nullable=False)
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class CouncilMotion(BaseModel):
@@ -412,7 +447,8 @@ class CouncilMotion(BaseModel):
     motion_hash = sa.Column(sa.String(64), nullable=False, index=True)
     account_id = sa.Column(sa.String(64), nullable=True)
     proposal_hash = sa.Column(sa.String(64), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    proposal = sa.Column(sa.JSON(), default=None,
+                         server_default=None, nullable=True)
     member_threshold = sa.Column(sa.Integer(), nullable=False)
     yes_votes_count = sa.Column(sa.Integer(), nullable=False)
     no_votes_count = sa.Column(sa.Integer(), nullable=False)
@@ -432,7 +468,8 @@ class CouncilMotionAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class CouncilVote(BaseModel):
@@ -455,13 +492,15 @@ class CouncilVoteAudit(BaseModel):
     block_id = sa.Column(sa.Integer(), index=True, nullable=False)
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class TreasuryProposal(BaseModel):
     __tablename__ = 'data_treasury_proposal'
 
-    proposal_id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
+    proposal_id = sa.Column(
+        sa.Integer(), primary_key=True, autoincrement=False)
     proposed_by_account_id = sa.Column(sa.String(64), nullable=True)
     value = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     beneficiary_account_id = sa.Column(sa.String(64), nullable=True)
@@ -480,17 +519,20 @@ class TreasuryProposalAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class TechCommProposal(BaseModel):
     __tablename__ = 'data_techcomm_proposal'
 
-    proposal_id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
+    proposal_id = sa.Column(
+        sa.Integer(), primary_key=True, autoincrement=False)
     motion_hash = sa.Column(sa.String(64), nullable=False, index=True)
     account_id = sa.Column(sa.String(64), nullable=True)
     proposal_hash = sa.Column(sa.String(64), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    proposal = sa.Column(sa.JSON(), default=None,
+                         server_default=None, nullable=True)
     member_threshold = sa.Column(sa.Integer(), nullable=False)
     yes_votes_count = sa.Column(sa.Integer(), nullable=False)
     no_votes_count = sa.Column(sa.Integer(), nullable=False)
@@ -510,7 +552,8 @@ class TechCommProposalAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class TechCommProposalVote(BaseModel):
@@ -533,7 +576,8 @@ class TechCommProposalVoteAudit(BaseModel):
     block_id = sa.Column(sa.Integer(), index=True, nullable=False)
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
-    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
 
 
 class Contract(BaseModel):
@@ -542,7 +586,8 @@ class Contract(BaseModel):
     code_hash = sa.Column(sa.String(64), primary_key=True)
     bytecode = sa.Column(LONGTEXT())
     source = sa.Column(LONGTEXT())
-    abi = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    abi = sa.Column(sa.JSON(), default=None,
+                    server_default=None, nullable=True)
     compiler = sa.Column(sa.String(64))
     created_at_block = sa.Column(sa.Integer(), nullable=False)
     created_at_extrinsic = sa.Column(sa.Integer())
@@ -560,14 +605,19 @@ class Runtime(BaseModel):
     spec_version = sa.Column(sa.Integer(), nullable=False, unique=True)
     spec_name = sa.Column(sa.String(255))
     authoring_version = sa.Column(sa.Integer())
-    apis = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
-    json_metadata = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
-    json_metadata_decoded = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+    apis = sa.Column(sa.JSON(), default=None,
+                     server_default=None, nullable=True)
+    json_metadata = sa.Column(sa.JSON(), default=None,
+                              server_default=None, nullable=True)
+    json_metadata_decoded = sa.Column(
+        sa.JSON(), default=None, server_default=None, nullable=True)
     count_modules = sa.Column(sa.Integer(), default=0, nullable=False)
     count_call_functions = sa.Column(sa.Integer(), default=0, nullable=False)
-    count_storage_functions = sa.Column(sa.Integer(), default=0, nullable=False)
+    count_storage_functions = sa.Column(
+        sa.Integer(), default=0, nullable=False)
     count_events = sa.Column(sa.Integer(), default=0, nullable=False)
-    count_constants = sa.Column(sa.Integer(), nullable=False, server_default='0')
+    count_constants = sa.Column(
+        sa.Integer(), nullable=False, server_default='0')
     count_errors = sa.Column(sa.Integer(), nullable=False, server_default='0')
 
     def serialize_id(self):
@@ -590,7 +640,8 @@ class RuntimeModule(BaseModel):
     count_call_functions = sa.Column(sa.Integer(), nullable=False)
     count_storage_functions = sa.Column(sa.Integer(), nullable=False)
     count_events = sa.Column(sa.Integer(), nullable=False)
-    count_constants = sa.Column(sa.Integer(), nullable=False, server_default='0')
+    count_constants = sa.Column(
+        sa.Integer(), nullable=False, server_default='0')
     count_errors = sa.Column(sa.Integer(), nullable=False, server_default='0')
 
     def serialize_id(self):
@@ -599,7 +650,8 @@ class RuntimeModule(BaseModel):
 
 class RuntimeCall(BaseModel):
     __tablename__ = 'runtime_call'
-    __table_args__ = (sa.UniqueConstraint('spec_version', 'module_id', 'call_id'),)
+    __table_args__ = (sa.UniqueConstraint(
+        'spec_version', 'module_id', 'call_id'),)
 
     id = sa.Column(sa.Integer(), primary_key=True)
     spec_version = sa.Column(sa.Integer(), nullable=False)
@@ -629,7 +681,8 @@ class RuntimeCallParam(BaseModel):
 
 class RuntimeEvent(BaseModel):
     __tablename__ = 'runtime_event'
-    __table_args__ = (sa.UniqueConstraint('spec_version', 'module_id', 'event_id'),)
+    __table_args__ = (sa.UniqueConstraint(
+        'spec_version', 'module_id', 'event_id'),)
 
     id = sa.Column(sa.Integer(), primary_key=True)
     spec_version = sa.Column(sa.Integer(), nullable=False)
@@ -732,7 +785,8 @@ class ReorgBlock(BaseModel):
 
     serialize_exclude = ['debug_info']
 
-    hash = sa.Column(sa.String(66), primary_key=True, index=True, nullable=False)
+    hash = sa.Column(sa.String(66), primary_key=True,
+                     index=True, nullable=False)
     id = sa.Column(sa.Integer(), index=True, autoincrement=False)
     parent_id = sa.Column(sa.Integer(), nullable=False)
     parent_hash = sa.Column(sa.String(66), index=True, nullable=False)
@@ -777,9 +831,11 @@ class ReorgBlock(BaseModel):
 class ReorgEvent(BaseModel):
     __tablename__ = 'data_reorg_event'
 
-    block_hash = sa.Column(sa.String(66), primary_key=True, index=True, nullable=False)
+    block_hash = sa.Column(sa.String(66), primary_key=True,
+                           index=True, nullable=False)
     block_id = sa.Column(sa.Integer(), index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
+    block = relationship(Block, foreign_keys=[
+                         block_id], primaryjoin=block_id == Block.id)
 
     event_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
 
@@ -807,9 +863,11 @@ class ReorgEvent(BaseModel):
 class ReorgExtrinsic(BaseModel):
     __tablename__ = 'data_reorg_extrinsic'
 
-    block_hash = sa.Column(sa.String(66), primary_key=True, index=True, nullable=False)
+    block_hash = sa.Column(sa.String(66), primary_key=True,
+                           index=True, nullable=False)
     block_id = sa.Column(sa.Integer(), index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
+    block = relationship(Block, foreign_keys=[
+                         block_id], primaryjoin=block_id == Block.id)
 
     extrinsic_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
     extrinsic_hash = sa.Column(sa.String(64), index=True, nullable=True)
@@ -850,7 +908,8 @@ class ReorgExtrinsic(BaseModel):
 class ReorgLog(BaseModel):
     __tablename__ = 'data_reorg_log'
 
-    block_hash = sa.Column(sa.String(66), primary_key=True, index=True, nullable=False)
+    block_hash = sa.Column(sa.String(66), primary_key=True,
+                           index=True, nullable=False)
     block_id = sa.Column(sa.Integer(), autoincrement=False)
     log_idx = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
     type_id = sa.Column(sa.Integer(), index=True)
@@ -860,9 +919,11 @@ class ReorgLog(BaseModel):
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.log_idx)
 
+
 class Trade(BaseModel):
     __tablename__ = 'data_trade'
-    __table_args__ = (sa.Index('ix_data_trade_block_id_base_quote','block_id', 'base', 'quote'),)
+    __table_args__ = (
+        sa.Index('ix_data_trade_block_id_base_quote', 'block_id', 'base', 'quote'),)
 
     trade_hash = sa.Column(sa.String(66), primary_key=True, nullable=False)
     block_id = sa.Column(sa.Integer())
@@ -883,6 +944,27 @@ class Trade(BaseModel):
         return '{}'.format(self.trade_hash)
 
 
+class Orders(BaseModel):
+    __tablename__ = 'data_order'
+    __table_args__ = (
+        sa.Index('ix_data_order_block_id_base_quote', 'block_id', 'base', 'quote'),)
+
+    order_hash = sa.Column(sa.String(66), primary_key=True, nullable=False)
+    block_id = sa.Column(sa.Integer())
+    extrinsic_idx = sa.Column(sa.Integer())
+    event_idx = sa.Column(sa.Integer())
+    base = sa.Column(sa.String(66), nullable=False)
+    quote = sa.Column(sa.String(66), nullable=False)
+    owner = sa.Column(sa.String(64), nullable=False)
+    otype = sa.Column(sa.SmallInteger(), nullable=False)
+    price = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    buy_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    sell_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+    def serialize_id(self):
+        return '{}'.format(self.order_hash)
+
+
 class MarketHistory_1m(BaseModel):
     __tablename__ = 'data_market_history_1m'
     __table_args__ = (
@@ -890,7 +972,7 @@ class MarketHistory_1m(BaseModel):
     serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
-    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    time = sa.Column(sa.DateTime(timezone=True), nullable=False)
     open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
@@ -899,14 +981,16 @@ class MarketHistory_1m(BaseModel):
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base = sa.Column(sa.String(66), nullable=False)
     quote = sa.Column(sa.String(66), nullable=False)
+
 
 class MarketHistory_5m(BaseModel):
     __tablename__ = 'data_market_history_5m'
-    __table_args__ = (sa.Index('ix_data_market_history_5m_base_quote', 'base', 'quote'),)
+    __table_args__ = (
+        sa.Index('ix_data_market_history_5m_base_quote', 'base', 'quote'),)
     serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
-    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    time = sa.Column(sa.DateTime(timezone=True), nullable=False)
     open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
@@ -915,6 +999,7 @@ class MarketHistory_5m(BaseModel):
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base = sa.Column(sa.String(66), nullable=False)
     quote = sa.Column(sa.String(66), nullable=False)
+
 
 class MarketHistory_1h(BaseModel):
     __tablename__ = 'data_market_history_1h'
@@ -923,7 +1008,7 @@ class MarketHistory_1h(BaseModel):
     serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
-    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    time = sa.Column(sa.DateTime(timezone=True), nullable=False)
     open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
@@ -933,6 +1018,7 @@ class MarketHistory_1h(BaseModel):
     base = sa.Column(sa.String(66), nullable=False)
     quote = sa.Column(sa.String(66), nullable=False)
 
+
 class MarketHistory_1d(BaseModel):
     __tablename__ = 'data_market_history_1d'
     __table_args__ = (
@@ -940,7 +1026,7 @@ class MarketHistory_1d(BaseModel):
     serialize_exclude = ["id"]
 
     id = sa.Column(sa.Integer(), primary_key=True)
-    time = sa.Column(sa.DateTime(timezone=True), nullable = False)
+    time = sa.Column(sa.DateTime(timezone=True), nullable=False)
     open = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     high = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     low = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
