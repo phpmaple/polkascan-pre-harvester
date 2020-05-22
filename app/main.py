@@ -34,7 +34,8 @@ from app.resources.harvester import PolkascanStartHarvesterResource, PolkascanSt
     RebuildSearchIndexResource, ProcessGenesisBlockResource, PolkascanHarvesterQueueResource, RebuildAccountInfoResource, MarketHistoryResource
 
 from app.resources.tools import ExtractMetadataResource, ExtractExtrinsicsResource, \
-    HealthCheckResource, ExtractEventsResource, CreateSnapshotResource, \ ResetMarketResource
+    HealthCheckResource, ExtractEventsResource, CreateSnapshotResource, \
+    ResetMarketResource
 
 # Database connection
 engine = create_engine(DB_CONNECTION, echo=DEBUG,
@@ -68,5 +69,4 @@ app.add_route('/tools/extrinsics/extract', ExtractExtrinsicsResource())
 app.add_route('/tools/events/extract', ExtractEventsResource())
 app.add_route('/tools/balance-snapshot', CreateSnapshotResource())
 app.add_route('/tools/market/reset', ResetMarketResource())
-
 

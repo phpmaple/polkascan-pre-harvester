@@ -26,6 +26,7 @@ from app.resources.base import BaseResource
 from scalecodec.base import ScaleBytes
 from scalecodec.metadata import MetadataDecoder
 from scalecodec.block import EventsDecoder, ExtrinsicsDecoder, ExtrinsicsBlock61181Decoder
+from app.models.harvester import Status
 
 from substrateinterface import SubstrateInterface
 from app.settings import SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION
@@ -38,7 +39,8 @@ class ExtractMetadataResource(BaseResource):
 
         if 'block_hash' in req.params:
             substrate = SubstrateInterface(SUBSTRATE_RPC_URL)
-            metadata = substrate.get_block_metadata(req.params.get('block_hash'))
+            metadata = substrate.get_block_metadata(
+                req.params.get('block_hash'))
 
             resp.status = falcon.HTTP_200
             resp.media = metadata.value
@@ -68,16 +70,19 @@ class ExtractExtrinsicsResource(BaseResource):
             extrinsics = json_block['block']['extrinsics']
 
             # Get metadata
-            metadata_decoder = substrate.get_block_metadata(json_block['block']['header']['parentHash'])
+            metadata_decoder = substrate.get_block_metadata(
+                json_block['block']['header']['parentHash'])
 
             #result = [{'runtime': substrate.get_block_runtime_version(req.params.get('block_hash')), 'metadata': metadata_result.get_data_dict()}]
             result = []
 
             for extrinsic in extrinsics:
                 if int(json_block['block']['header']['number'], 16) == 61181:
-                    extrinsics_decoder = ExtrinsicsBlock61181Decoder(ScaleBytes(extrinsic), metadata=metadata_decoder)
+                    extrinsics_decoder = ExtrinsicsBlock61181Decoder(
+                        ScaleBytes(extrinsic), metadata=metadata_decoder)
                 else:
-                    extrinsics_decoder = ExtrinsicsDecoder(ScaleBytes(extrinsic), metadata=metadata_decoder)
+                    extrinsics_decoder = ExtrinsicsDecoder(
+                        ScaleBytes(extrinsic), metadata=metadata_decoder)
                 result.append(extrinsics_decoder.decode())
 
             resp.status = falcon.HTTP_201
@@ -94,13 +99,16 @@ class ExtractEventsResource(BaseResource):
         json_block = substrate.get_block_header(req.params.get('block_hash'))
 
         # Get metadata
-        metadata_decoder = substrate.get_block_metadata(json_block['parentHash'])
+        metadata_decoder = substrate.get_block_metadata(
+            json_block['parentHash'])
 
         # Get events for block hash
-        events_decoder = substrate.get_block_events(req.params.get('block_hash'), metadata_decoder=metadata_decoder)
+        events_decoder = substrate.get_block_events(
+            req.params.get('block_hash'), metadata_decoder=metadata_decoder)
 
         resp.status = falcon.HTTP_201
-        resp.media = {'events': events_decoder.value, 'runtime': substrate.get_block_runtime_version(req.params.get('block_hash'))}
+        resp.media = {'events': events_decoder.value, 'runtime': substrate.get_block_runtime_version(
+            req.params.get('block_hash'))}
 
 
 class HealthCheckResource(BaseResource):
@@ -170,6 +178,7 @@ class ResetMarketResource(BaseResource):
             }
         }
 
+
 class CreateSnapshotResource(BaseResource):
 
     def on_post(self, req, resp):
@@ -181,5 +190,5 @@ class CreateSnapshotResource(BaseResource):
             block_ids=req.media.get('block_ids')
         )
 
-        resp.media = {'result': 'Balance snapshop task started', 'task_id': task.id}
-
+        resp.media = {
+            'result': 'Balance snapshop task started', 'task_id': task.id}
