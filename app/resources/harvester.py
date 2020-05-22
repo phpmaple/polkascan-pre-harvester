@@ -1,6 +1,6 @@
 #  Polkascan PRE Harvester
 #
-#  Copyright 2018-2019 openAware BV (NL).
+#  Copyright 2018-2020 openAware BV (NL).
 #  This file is part of Polkascan.
 #
 #  Polkascan is free software: you can redistribute it and/or modify
@@ -24,17 +24,19 @@ from decimal import *
 import json
 
 import falcon
+import pytz
 from celery.result import AsyncResult
 from falcon.media.validators.jsonschema import validate
 from sqlalchemy import text, func
 
+from app import settings
 from app.models.data import Block, BlockTotal, MarketHistory_1m, MarketHistory_5m, MarketHistory_1h, MarketHistory_1d
 from app.models.harvester import Setting, Status
 from app.resources.base import BaseResource
 from app.schemas import load_schema
 from app.processors.converters import PolkascanHarvesterService, BlockAlreadyAdded, BlockIntegrityError
 from substrateinterface import SubstrateInterface
-from app.tasks import accumulate_block_recursive, start_harvester
+from app.tasks import accumulate_block_recursive, start_harvester, rebuild_search_index, rebuild_account_info_snapshot
 from app.settings import SUBSTRATE_RPC_URL, TYPE_REGISTRY
 
 
@@ -79,7 +81,7 @@ class PolkaScanCheckHarvesterTaskResource(BaseResource):
         resp.media = result
 
 
-class PolkascanStatusHarvesterResource(BaseResource):
+class PolkascanHarvesterQueueResource(BaseResource):
 
     def on_get(self, req, resp):
 
@@ -110,6 +112,38 @@ class PolkascanStatusHarvesterResource(BaseResource):
                     ]
                 }
             }
+
+
+class PolkascanHarvesterStatusResource(BaseResource):
+
+    def on_get(self, req, resp):
+
+        sequencer_task = Status.get_status(self.session, 'SEQUENCER_TASK_ID')
+        integrity_head = Status.get_status(self.session, 'INTEGRITY_HEAD')
+        sequencer_head = self.session.query(func.max(BlockTotal.id)).one()[0]
+        best_block = Block.query(self.session).filter_by(
+            id=self.session.query(func.max(Block.id)).one()[0]).first()
+
+        if best_block:
+            best_block_datetime = best_block.datetime.replace(tzinfo=pytz.UTC).timestamp() * 1000
+            best_block_nr = best_block.id
+        else:
+            best_block_datetime = None
+            best_block_nr = None
+
+        substrate = SubstrateInterface(SUBSTRATE_RPC_URL)
+        chain_head_block_id = substrate.get_block_number(substrate.get_chain_head())
+        chain_finalized_block_id = substrate.get_block_number(substrate.get_chain_finalised_head())
+
+        resp.media = {
+            'best_block_datetime': best_block_datetime,
+            'best_block_nr': best_block_nr,
+            'sequencer_task': sequencer_task.value,
+            'sequencer_head': sequencer_head,
+            'integrity_head': int(integrity_head.value),
+            'chain_head_block_id': chain_head_block_id,
+            'chain_finalized_block_id': chain_finalized_block_id
+        }
 
 
 class PolkascanProcessBlockResource(BaseResource):
@@ -260,6 +294,24 @@ class StartSequenceBlockResource(BaseResource):
         }
 
 
+class ProcessGenesisBlockResource(BaseResource):
+
+    def on_post(self, req, resp):
+
+        harvester = PolkascanHarvesterService(self.session, type_registry=TYPE_REGISTRY)
+        block = Block.query(self.session).get(1)
+        if block:
+            result = harvester.process_genesis(block=block)
+        else:
+            result = 'Block #1 required to process genesis'
+
+        self.session.commit()
+
+        resp.media = {
+            'result': result
+        }
+
+
 class StartIntegrityResource(BaseResource):
 
     def on_post(self, req, resp):
@@ -274,6 +326,43 @@ class StartIntegrityResource(BaseResource):
             'result': result
         }
 
+
+class RebuildSearchIndexResource(BaseResource):
+
+    def on_post(self, req, resp):
+        if settings.CELERY_RUNNING:
+            task = rebuild_search_index.delay()
+            data = {
+                'task_id': task.id
+            }
+        else:
+            data = rebuild_search_index()
+
+        resp.status = falcon.HTTP_201
+
+        resp.media = {
+            'status': 'Search index rebuild task created',
+            'data': data
+        }
+
+
+class RebuildAccountInfoResource(BaseResource):
+
+    def on_post(self, req, resp):
+        if settings.CELERY_RUNNING:
+            task = rebuild_account_info_snapshot.delay()
+            data = {
+                'task_id': task.id
+            }
+        else:
+            data = rebuild_account_info_snapshot()
+
+        resp.status = falcon.HTTP_201
+
+        resp.media = {
+            'status': 'Search index rebuild task created',
+            'data': data
+        }
 
 class MarketHistoryResource(BaseResource):
     def on_get(self, req, resp):

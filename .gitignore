@@ -104,3 +104,4 @@ data/
 .mypy_cache/
 .idea
 .vscode
+/.DS_Store

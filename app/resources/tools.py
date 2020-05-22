@@ -1,6 +1,6 @@
 #  Polkascan PRE Harvester
 #
-#  Copyright 2018-2019 openAware BV (NL).
+#  Copyright 2018-2020 openAware BV (NL).
 #  This file is part of Polkascan.
 #
 #  Polkascan is free software: you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 
 import falcon
 
+from app.processors.converters import PolkascanHarvesterService
 from app.resources.base import BaseResource
 
 from scalecodec.base import ScaleBytes
@@ -28,6 +29,7 @@ from scalecodec.block import EventsDecoder, ExtrinsicsDecoder, ExtrinsicsBlock61
 
 from substrateinterface import SubstrateInterface
 from app.settings import SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION
+from app.tasks import balance_snapshot
 
 
 class ExtractMetadataResource(BaseResource):
@@ -167,3 +169,17 @@ class ResetMarketResource(BaseResource):
                 'message': ''
             }
         }
+
+class CreateSnapshotResource(BaseResource):
+
+    def on_post(self, req, resp):
+
+        task = balance_snapshot.delay(
+            account_id=req.media.get('account_id'),
+            block_start=req.media.get('block_start'),
+            block_end=req.media.get('block_end'),
+            block_ids=req.media.get('block_ids')
+        )
+
+        resp.media = {'result': 'Balance snapshop task started', 'task_id': task.id}
+

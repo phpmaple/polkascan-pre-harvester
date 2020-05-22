@@ -1,6 +1,6 @@
 #  Polkascan PRE Harvester
 #
-#  Copyright 2018-2019 openAware BV (NL).
+#  Copyright 2018-2020 openAware BV (NL).
 #  This file is part of Polkascan.
 #
 #  Polkascan is free software: you can redistribute it and/or modify
@@ -18,27 +18,25 @@
 #
 #  block.py
 #
+import binascii
+import dateutil
 import datetime
 
-import dateutil
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.sql import func
+from sqlalchemy import distinct
 
-from app.models.data import Log, AccountAudit, Account, AccountIndexAudit, AccountIndex, DemocracyProposalAudit, \
-    DemocracyProposal, DemocracyReferendumAudit, DemocracyReferendum, DemocracyVoteAudit, DemocracyVote, \
-    CouncilMotionAudit, CouncilMotion, CouncilVoteAudit, CouncilVote, TechCommProposal, TechCommProposalAudit, \
-    TechCommProposalVoteAudit, TechCommProposalVote, TreasuryProposalAudit, TreasuryProposal, Block, Trade, MarketHistory_1m, MarketHistory_5m, MarketHistory_1h, MarketHistory_1d
-from app.settings import ACCOUNT_AUDIT_TYPE_NEW, ACCOUNT_AUDIT_TYPE_REAPED, ACCOUNT_INDEX_AUDIT_TYPE_NEW, \
-    ACCOUNT_INDEX_AUDIT_TYPE_REAPED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_PROPOSED, DEMOCRACY_PROPOSAL_AUDIT_TYPE_TABLED, \
-    DEMOCRACY_REFERENDUM_AUDIT_TYPE_STARTED, DEMOCRACY_REFERENDUM_AUDIT_TYPE_PASSED, \
-    DEMOCRACY_REFERENDUM_AUDIT_TYPE_NOTPASSED, DEMOCRACY_REFERENDUM_AUDIT_TYPE_CANCELLED, \
-    DEMOCRACY_REFERENDUM_AUDIT_TYPE_EXECUTED, SUBSTRATE_ADDRESS_TYPE, DEMOCRACY_VOTE_AUDIT_TYPE_NORMAL, \
-    DEMOCRACY_VOTE_AUDIT_TYPE_PROXY, COUNCIL_MOTION_TYPE_PROPOSED, COUNCIL_MOTION_TYPE_APPROVED, \
-    COUNCIL_MOTION_TYPE_DISAPPROVED, COUNCIL_MOTION_TYPE_EXECUTED, TECHCOMM_PROPOSAL_TYPE_PROPOSED, \
-    TECHCOMM_PROPOSAL_TYPE_APPROVED, TECHCOMM_PROPOSAL_TYPE_DISAPPROVED, TECHCOMM_PROPOSAL_TYPE_EXECUTED, \
-    TREASURY_PROPOSAL_TYPE_PROPOSED, TREASURY_PROPOSAL_TYPE_AWARDED, TREASURY_PROPOSAL_TYPE_REJECTED
+from sqlalchemy.orm.exc import NoResultFound
+from substrateinterface.utils.hasher import blake2_256
+
+from app import settings
+from substrateinterface.utils.hasher import blake2_256
+
+from sqlalchemy.sql import func
+from app.models.data import Log, AccountAudit, Account, AccountIndexAudit, AccountIndex, \
+    SessionValidator, IdentityAudit, IdentityJudgementAudit, IdentityJudgement, SearchIndex, AccountInfoSnapshot, \
+Block, Trade, MarketHistory_1m, MarketHistory_5m, MarketHistory_1h, MarketHistory_1d
+
 from app.utils.ss58 import ss58_encode, ss58_encode_account_index
-from scalecodec.base import ScaleBytes
+from scalecodec.base import ScaleBytes, RuntimeConfiguration
 
 from app.processors.base import BlockProcessor
 from scalecodec.block import LogDigest
@@ -62,11 +60,38 @@ class LogBlockProcessor(BlockProcessor):
                 data=log_digest.value,
             )
 
+            if log.type == 'PreRuntime':
+                if log.data['value']['engine'] == 'BABE':
+                    # Determine block producer
+                    babe_predigest_cls = RuntimeConfiguration().get_decoder_class('RawBabePreDigest')
+
+                    babe_predigest = babe_predigest_cls(
+                        ScaleBytes(bytearray.fromhex(log.data['value']['data'].replace('0x', '')))
+                    ).decode()
+
+                    if babe_predigest['value']:
+                        log.data['value']['data'] = babe_predigest['value']
+                        self.block.authority_index = log.data['value']['data']['authorityIndex']
+                        self.block.slot_number = log.data['value']['data']['slotNumber']
+
+                if log.data['value']['engine'] == 'aura':
+                    aura_predigest_cls = RuntimeConfiguration().get_decoder_class('RawAuraPreDigest')
+
+                    aura_predigest = aura_predigest_cls(
+                        ScaleBytes(bytearray.fromhex(log.data['value']['data'].replace('0x', '')))
+                    ).decode()
+
+                    log.data['value']['data'] = aura_predigest
+                    self.block.slot_number = aura_predigest['slotNumber']
+
             log.save(db_session)
 
     def accumulation_revert(self, db_session):
         for item in Log.query(db_session).filter_by(block_id=self.block.id):
             db_session.delete(item)
+
+        self.block.authority_index = None
+        self.block.slot_number = None
 
 
 class BlockTotalProcessor(BlockProcessor):
@@ -135,6 +160,29 @@ class BlockTotalProcessor(BlockProcessor):
         if parent_block_data and parent_block_data['count_sessions_new'] > 0:
             self.sequenced_block.session_id += 1
 
+        if self.block.slot_number is not None:
+
+            rank_validator = None
+
+            if self.block.authority_index is not None:
+                rank_validator = self.block.authority_index
+            else:
+                # In case of AURA, validator slot is determined by unique slot number
+                validator_count = SessionValidator.query(db_session).filter_by(
+                    session_id=self.sequenced_block.session_id
+                ).count()
+
+                if validator_count > 0:
+                    rank_validator = int(self.block.slot_number) % validator_count
+
+            # Retrieve block producer from session validator set
+            validator = SessionValidator.query(db_session).filter_by(
+                session_id=self.sequenced_block.session_id,
+                rank_validator=rank_validator).first()
+
+            if validator:
+                self.sequenced_block.author = validator.validator_stash
+
 
 class AccountBlockProcessor(BlockProcessor):
 
@@ -153,11 +201,11 @@ class AccountBlockProcessor(BlockProcessor):
                 account = Account.query(db_session).filter_by(
                     id=account_audit.account_id).one()
 
-                if account_audit.type_id == ACCOUNT_AUDIT_TYPE_REAPED:
+                if account_audit.type_id == settings.ACCOUNT_AUDIT_TYPE_REAPED:
                     account.count_reaped += 1
                     account.is_reaped = True
 
-                elif account_audit.type_id == ACCOUNT_AUDIT_TYPE_NEW:
+                elif account_audit.type_id == settings.ACCOUNT_AUDIT_TYPE_NEW:
                     account.is_reaped = False
 
                 account.updated_at_block = self.block.id
@@ -166,379 +214,47 @@ class AccountBlockProcessor(BlockProcessor):
 
                 account = Account(
                     id=account_audit.account_id,
-                    address=ss58_encode(
-                        account_audit.account_id, SUBSTRATE_ADDRESS_TYPE),
+                    address=ss58_encode(account_audit.account_id, settings.SUBSTRATE_ADDRESS_TYPE),
+                    hash_blake2b=blake2_256(binascii.unhexlify(account_audit.account_id)),
+                    is_treasury=(account_audit.data or {}).get('is_treasury', False),
+                    is_sudo=(account_audit.data or {}).get('is_sudo', False),
+                    was_sudo=(account_audit.data or {}).get('is_sudo', False),
                     created_at_block=self.block.id,
                     updated_at_block=self.block.id,
                     balance=0
                 )
 
-                # If reaped but does not exist, create new account for now
-                if account_audit.type_id != ACCOUNT_AUDIT_TYPE_NEW:
-                    account.is_reaped = True
-                    account.count_reaped = 1
+               # Retrieve index in corresponding account
+                account_index = AccountIndex.query(db_session).filter_by(account_id=account.id).first()
+
+                if account_index:
+
+                    account.index_address = account_index.short_address
+
+                # Retrieve and set initial balance
+                try:
+                    account_info_data = self.substrate.get_runtime_state(
+                        module='System',
+                        storage_function='Account',
+                        params=['0x{}'.format(account.id)],
+                        block_hash=self.block.hash
+                    ).get('result')
+
+                    if account_info_data:
+
+                        account.balance_free = account_info_data["data"]["free"]
+                        account.balance_reserved = account_info_data["data"]["reserved"]
+                        account.balance_total = account_info_data["data"]["free"] + account_info_data["data"]["reserved"]
+                        account.nonce = account_info_data["nonce"]
+                except ValueError:
+                    pass
+
+                # # If reaped but does not exist, create new account for now
+                # if account_audit.type_id != ACCOUNT_AUDIT_TYPE_NEW:
+                #     account.is_reaped = True
+                #     account.count_reaped = 1
 
             account.save(db_session)
-
-
-class DemocracyProposalBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for proposal_audit in DemocracyProposalAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
-
-            if proposal_audit.type_id == DEMOCRACY_PROPOSAL_AUDIT_TYPE_PROPOSED:
-                status = 'Proposed'
-            elif proposal_audit.type_id == DEMOCRACY_PROPOSAL_AUDIT_TYPE_TABLED:
-                status = 'Tabled'
-            else:
-                status = '[unknown]'
-
-            try:
-                proposal = DemocracyProposal.query(db_session).filter_by(
-                    id=proposal_audit.democracy_proposal_id).one()
-
-                proposal.status = status
-                proposal.updated_at_block = self.block.id
-
-            except NoResultFound:
-
-                proposal = DemocracyProposal(
-                    id=proposal_audit.democracy_proposal_id,
-                    proposal=proposal_audit.data['proposal'],
-                    bond=proposal_audit.data['bond'],
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id,
-                    status=status
-                )
-
-            proposal.save(db_session)
-
-
-class DemocracyReferendumBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        # TODO force insert on Started status
-        for referendum_audit in DemocracyReferendumAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
-
-            success = None
-            vote_threshold = None
-            proposal = None
-
-            if referendum_audit.type_id == DEMOCRACY_REFERENDUM_AUDIT_TYPE_STARTED:
-                status = 'Started'
-                vote_threshold = referendum_audit.data.get('vote_threshold')
-                proposal = referendum_audit.data.get('proposal')
-
-            elif referendum_audit.type_id == DEMOCRACY_REFERENDUM_AUDIT_TYPE_PASSED:
-                status = 'Passed'
-            elif referendum_audit.type_id == DEMOCRACY_REFERENDUM_AUDIT_TYPE_NOTPASSED:
-                status = 'NotPassed'
-            elif referendum_audit.type_id == DEMOCRACY_REFERENDUM_AUDIT_TYPE_CANCELLED:
-                status = 'Cancelled'
-            elif referendum_audit.type_id == DEMOCRACY_REFERENDUM_AUDIT_TYPE_EXECUTED:
-                status = 'Executed'
-                success = referendum_audit.data.get('success')
-            else:
-                status = '[unknown]'
-
-            try:
-                referendum = DemocracyReferendum.query(db_session).filter_by(
-                    id=referendum_audit.democracy_referendum_id).one()
-
-                if proposal:
-                    referendum.proposal = proposal
-
-                referendum.status = status
-                referendum.updated_at_block = self.block.id
-                referendum.success = success
-
-            except NoResultFound:
-
-                referendum = DemocracyReferendum(
-                    id=referendum_audit.democracy_referendum_id,
-                    vote_threshold=vote_threshold,
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id,
-                    proposal=proposal,
-                    success=success,
-                    status=status
-                )
-
-            referendum.save(db_session)
-
-
-class DemocracyVoteBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for vote_audit in DemocracyVoteAudit.query(db_session).filter_by(block_id=self.block.id).order_by('extrinsic_idx'):
-
-            try:
-                vote = DemocracyVote.query(db_session).filter_by(
-                    democracy_referendum_id=vote_audit.democracy_referendum_id,
-                    stash_account_id=vote_audit.data.get('stash_account_id')
-                ).one()
-
-                vote.updated_at_block = self.block.id
-
-            except NoResultFound:
-
-                vote = DemocracyVote(
-                    democracy_referendum_id=vote_audit.democracy_referendum_id,
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id,
-                    stash_account_id=vote_audit.data.get('stash_account_id')
-                )
-
-            vote.vote_account_id = vote_audit.data.get('vote_account_id')
-            vote.vote_raw = vote_audit.data.get('vote_raw')
-            vote.vote_yes = vote_audit.data.get('vote_yes')
-            vote.vote_no = vote_audit.data.get('vote_no')
-            vote.stash = vote_audit.data.get('stash')
-            vote.conviction = vote_audit.data.get('conviction')
-            vote.vote_yes_weighted = vote_audit.data.get('vote_yes_weighted')
-            vote.vote_no_weighted = vote_audit.data.get('vote_no_weighted')
-
-            vote.save(db_session)
-
-
-class CouncilMotionBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for motion_audit in CouncilMotionAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
-
-            if motion_audit.type_id == COUNCIL_MOTION_TYPE_PROPOSED:
-                motion = CouncilMotion(
-                    motion_hash=motion_audit.motion_hash,
-                    account_id=motion_audit.data.get(
-                        'proposedBy').replace('0x', ''),
-                    proposal=motion_audit.data.get('proposal'),
-                    proposal_hash=motion_audit.data.get('proposalHash'),
-                    member_threshold=motion_audit.data.get('threshold'),
-                    proposal_id=motion_audit.data.get('proposalIndex'),
-                    yes_votes_count=0,
-                    no_votes_count=0,
-                    status='Proposed',
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id
-                )
-
-                motion.save(db_session)
-            else:
-
-                motion = CouncilMotion.query(db_session).filter(
-                    CouncilMotion.motion_hash == motion_audit.motion_hash,
-                    CouncilMotion.status != 'Disapproved',
-                    CouncilMotion.status != 'Executed',
-                ).first()
-
-                # Check if motion exists (otherwise motion is created in event that is not yet processed)
-                if motion:
-                    motion.updated_at_block = self.block.id
-
-                    if motion_audit.type_id == COUNCIL_MOTION_TYPE_APPROVED:
-                        motion.approved = motion_audit.data.get('approved')
-                        motion.status = 'Approved'
-                    elif motion_audit.type_id == COUNCIL_MOTION_TYPE_DISAPPROVED:
-                        motion.approved = motion_audit.data.get('approved')
-                        motion.status = 'Disapproved'
-                    elif motion_audit.type_id == COUNCIL_MOTION_TYPE_EXECUTED:
-                        motion.executed = motion_audit.data.get('executed')
-                        motion.status = 'Executed'
-                    else:
-                        motion.status = '[unknown]'
-
-                    motion.save(db_session)
-
-
-class CouncilVoteBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for vote_audit in CouncilVoteAudit.query(db_session).filter_by(block_id=self.block.id).order_by('extrinsic_idx'):
-
-            motion = CouncilMotion.query(db_session).filter(
-                CouncilMotion.motion_hash == vote_audit.motion_hash,
-                CouncilMotion.status != 'Disapproved',
-                CouncilMotion.status != 'Executed',
-            ).first()
-
-            if motion:
-
-                try:
-                    vote = CouncilVote.query(db_session).filter_by(
-                        proposal_id=motion.proposal_id,
-                        account_id=vote_audit.data.get(
-                            'account_id').replace('0x', ''),
-                    ).one()
-
-                    vote.updated_at_block = self.block.id
-
-                except NoResultFound:
-
-                    vote = CouncilVote(
-                        proposal_id=motion.proposal_id,
-                        motion_hash=vote_audit.motion_hash,
-                        created_at_block=self.block.id,
-                        updated_at_block=self.block.id,
-                        account_id=vote_audit.data.get(
-                            'account_id').replace('0x', ''),
-                    )
-
-                vote.vote = vote_audit.data.get('vote')
-
-                # Update total vote count on motion
-
-                motion.yes_votes_count = vote_audit.data.get('yes_votes_count')
-                motion.no_votes_count = vote_audit.data.get('no_votes_count')
-
-                motion.save(db_session)
-
-                vote.save(db_session)
-
-
-class TechCommProposalBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for motion_audit in TechCommProposalAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
-
-            if motion_audit.type_id == TECHCOMM_PROPOSAL_TYPE_PROPOSED:
-                motion = TechCommProposal(
-                    motion_hash=motion_audit.motion_hash,
-                    account_id=motion_audit.data.get(
-                        'proposedBy').replace('0x', ''),
-                    proposal=motion_audit.data.get('proposal'),
-                    proposal_hash=motion_audit.data.get('proposalHash'),
-                    member_threshold=motion_audit.data.get('threshold'),
-                    proposal_id=motion_audit.data.get('proposalIndex'),
-                    yes_votes_count=0,
-                    no_votes_count=0,
-                    status='Proposed',
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id
-                )
-
-                motion.save(db_session)
-            else:
-
-                motion = TechCommProposal.query(db_session).filter(
-                    TechCommProposal.motion_hash == motion_audit.motion_hash,
-                    TechCommProposal.status != 'Disapproved',
-                    TechCommProposal.status != 'Executed',
-                ).first()
-
-                # Check if motion exists (otherwise motion is created in event that is not yet processed)
-                if motion:
-                    motion.updated_at_block = self.block.id
-
-                    if motion_audit.type_id == TECHCOMM_PROPOSAL_TYPE_APPROVED:
-                        motion.approved = motion_audit.data.get('approved')
-                        motion.status = 'Approved'
-                    elif motion_audit.type_id == TECHCOMM_PROPOSAL_TYPE_DISAPPROVED:
-                        motion.approved = motion_audit.data.get('approved')
-                        motion.status = 'Disapproved'
-                    elif motion_audit.type_id == TECHCOMM_PROPOSAL_TYPE_EXECUTED:
-                        motion.executed = motion_audit.data.get('executed')
-                        motion.status = 'Executed'
-                    else:
-                        motion.status = '[unknown]'
-
-                    motion.save(db_session)
-
-
-class TechCommProposalVoteBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for vote_audit in TechCommProposalVoteAudit.query(db_session).filter_by(block_id=self.block.id).order_by('extrinsic_idx'):
-
-            motion = TechCommProposal.query(db_session).filter(
-                TechCommProposal.motion_hash == vote_audit.motion_hash,
-                TechCommProposal.status != 'Disapproved',
-                TechCommProposal.status != 'Executed',
-            ).first()
-
-            if motion:
-
-                try:
-                    vote = TechCommProposalVote.query(db_session).filter_by(
-                        proposal_id=motion.proposal_id,
-                        account_id=vote_audit.data.get(
-                            'account_id').replace('0x', ''),
-                    ).one()
-
-                    vote.updated_at_block = self.block.id
-
-                except NoResultFound:
-
-                    vote = TechCommProposalVote(
-                        proposal_id=motion.proposal_id,
-                        motion_hash=vote_audit.motion_hash,
-                        created_at_block=self.block.id,
-                        updated_at_block=self.block.id,
-                        account_id=vote_audit.data.get(
-                            'account_id').replace('0x', ''),
-                    )
-
-                vote.vote = vote_audit.data.get('vote')
-
-                # Update total vote count on motion
-
-                motion.yes_votes_count = vote_audit.data.get('yes_votes_count')
-                motion.no_votes_count = vote_audit.data.get('no_votes_count')
-
-                motion.save(db_session)
-
-                vote.save(db_session)
-
-
-class TreasuryProposalBlockProcessor(BlockProcessor):
-
-    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
-
-        for proposal_audit in TreasuryProposalAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
-
-            if proposal_audit.type_id == TREASURY_PROPOSAL_TYPE_PROPOSED:
-                proposal = TreasuryProposal(
-                    proposal_id=proposal_audit.proposal_id,
-                    proposed_by_account_id=proposal_audit.data.get(
-                        'proposedBy').replace('0x', ''),
-                    beneficiary_account_id=proposal_audit.data.get(
-                        'beneficiary').replace('0x', ''),
-                    value=proposal_audit.data.get('value'),
-                    status='Proposed',
-                    created_at_block=self.block.id,
-                    updated_at_block=self.block.id
-                )
-
-                proposal.save(db_session)
-            else:
-
-                proposal = TreasuryProposal.query(db_session).filter(
-                    TreasuryProposal.proposal_id == proposal_audit.proposal_id,
-                    TreasuryProposal.status != 'Awarded',
-                    TreasuryProposal.status != 'Rejected',
-                ).first()
-
-                # Check if proposal exists (otherwise motion is created in event that is not yet processed)
-                if proposal:
-                    proposal.updated_at_block = self.block.id
-
-                    if proposal_audit.type_id == TREASURY_PROPOSAL_TYPE_AWARDED:
-                        proposal.status = 'Awarded'
-                    elif proposal_audit.type_id == TREASURY_PROPOSAL_TYPE_REJECTED:
-                        proposal.status = 'Rejected'
-                        proposal.slash_value = proposal_audit.data.get(
-                            'slash_value')
-                    else:
-                        proposal.status = '[unknown]'
-
-                    proposal.save(db_session)
-
 
 class AccountIndexBlockProcessor(BlockProcessor):
 
@@ -548,7 +264,7 @@ class AccountIndexBlockProcessor(BlockProcessor):
                 block_id=self.block.id
         ).order_by('event_idx'):
 
-            if account_index_audit.type_id == ACCOUNT_INDEX_AUDIT_TYPE_NEW:
+            if account_index_audit.type_id == settings.ACCOUNT_INDEX_AUDIT_TYPE_NEW:
 
                 # Check if account index already exists
                 account_index = AccountIndex.query(db_session).filter_by(
@@ -565,21 +281,237 @@ class AccountIndexBlockProcessor(BlockProcessor):
                 account_index.account_id = account_index_audit.account_id
                 account_index.short_address = ss58_encode_account_index(
                     account_index_audit.account_index_id,
-                    SUBSTRATE_ADDRESS_TYPE
+                    settings.SUBSTRATE_ADDRESS_TYPE
                 )
                 account_index.updated_at_block = self.block.id
 
                 account_index.save(db_session)
 
-            elif account_index_audit.type_id == ACCOUNT_INDEX_AUDIT_TYPE_REAPED:
+                # Update index in corresponding account
+                account = Account.query(db_session).get(account_index.account_id)
 
-                for account_index in AccountIndex.query(db_session).filter_by(
+                if account:
+                    account.index_address = account_index.short_address
+                    account.save(db_session)
+
+            elif account_index_audit.type_id == settings.ACCOUNT_INDEX_AUDIT_TYPE_REAPED:
+
+                if account_index_audit.account_index_id:
+                    account_index_list = AccountIndex.query(db_session).filter_by(
+                        id=account_index_audit.account_index_id
+                    )
+                else:
+                    account_index_list = AccountIndex.query(db_session).filter_by(
                         account_id=account_index_audit.account_id
-                ):
+                    )
+
+                for account_index in account_index_list:
 
                     account_index.account_id = None
                     account_index.is_reclaimable = True
                     account_index.updated_at_block = self.block.id
+                    account_index.save(db_session)
+
+
+class IdentityBlockProcessor(BlockProcessor):
+
+    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
+
+        for identity_audit in IdentityAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
+
+            account = Account.query(db_session).get(identity_audit.account_id)
+
+            if account:
+
+                if identity_audit.type_id == settings.IDENTITY_TYPE_SET:
+
+                    account.has_identity = True
+
+                    account.identity_display = identity_audit.data.get('display')
+                    account.identity_email = identity_audit.data.get('email')
+                    account.identity_legal = identity_audit.data.get('legal')
+                    account.identity_riot = identity_audit.data.get('riot')
+                    account.identity_web = identity_audit.data.get('web')
+                    account.identity_twitter = identity_audit.data.get('twitter')
+
+                    if account.has_subidentity:
+                        # Update sub accounts
+                        sub_accounts = Account.query(db_session).filter_by(parent_identity=account.id)
+                        for sub_account in sub_accounts:
+                            sub_account.identity_display = account.identity_display
+                            sub_account.identity_email = account.identity_email
+                            sub_account.identity_legal = account.identity_legal
+                            sub_account.identity_riot = account.identity_riot
+                            sub_account.identity_web = account.identity_web
+                            sub_account.identity_twitter = account.identity_twitter
+
+                            sub_account.save(db_session)
+
+                    account.save(db_session)
+                elif identity_audit.type_id in [settings.IDENTITY_TYPE_CLEARED, settings.IDENTITY_TYPE_KILLED]:
+
+                    if account.has_subidentity:
+                        # Clear sub accounts
+                        sub_accounts = Account.query(db_session).filter_by(parent_identity=account.id)
+                        for sub_account in sub_accounts:
+                            sub_account.identity_display = None
+                            sub_account.identity_email = None
+                            sub_account.identity_legal = None
+                            sub_account.identity_riot = None
+                            sub_account.identity_web = None
+                            sub_account.identity_twitter = None
+                            sub_account.parent_identity = None
+                            sub_account.has_identity = False
+
+                            sub_account.identity_judgement_good = 0
+                            sub_account.identity_judgement_bad = 0
+
+                            sub_account.save(db_session)
+
+                    account.has_identity = False
+                    account.has_subidentity = False
+
+                    account.identity_display = None
+                    account.identity_email = None
+                    account.identity_legal = None
+                    account.identity_riot = None
+                    account.identity_web = None
+                    account.identity_twitter = None
+
+                    account.identity_judgement_good = 0
+                    account.identity_judgement_bad = 0
+
+                    account.save(db_session)
+
+                elif identity_audit.type_id == settings.IDENTITY_TYPE_SET_SUBS:
+
+                    # Clear current subs
+                    sub_accounts = Account.query(db_session).filter_by(parent_identity=account.id)
+                    for sub_account in sub_accounts:
+                        sub_account.identity_display = None
+                        sub_account.identity_email = None
+                        sub_account.identity_legal = None
+                        sub_account.identity_riot = None
+                        sub_account.identity_web = None
+                        sub_account.identity_twitter = None
+                        sub_account.parent_identity = None
+                        sub_account.identity_judgement_good = 0
+                        sub_account.identity_judgement_bad = 0
+                        sub_account.has_identity = False
+
+                        sub_account.save(db_session)
+
+                    account.has_subidentity = False
+
+                    # Process sub indenties
+                    if len(identity_audit.data.get('subs', [])) > 0:
+
+                        account.has_subidentity = True
+
+                        for sub_identity in identity_audit.data.get('subs'):
+                            sub_account = Account.query(db_session).get(sub_identity['account'].replace('0x', ''))
+                            if sub_account:
+                                sub_account.parent_identity = account.id
+                                sub_account.subidentity_display = sub_identity['name']
+
+                                sub_account.identity_display = account.identity_display
+                                sub_account.identity_email = account.identity_email
+                                sub_account.identity_legal = account.identity_legal
+                                sub_account.identity_riot = account.identity_riot
+                                sub_account.identity_web = account.identity_web
+                                sub_account.identity_twitter = account.identity_twitter
+
+                                sub_account.identity_judgement_good = account.identity_judgement_good
+                                sub_account.identity_judgement_bad = account.identity_judgement_bad
+
+                                sub_account.has_identity = True
+
+                                sub_account.save(db_session)
+
+                    account.save(db_session)
+
+
+class IdentityJudgementBlockProcessor(BlockProcessor):
+
+    def sequencing_hook(self, db_session, parent_block_data, parent_sequenced_block_data):
+
+        for identity_audit in IdentityJudgementAudit.query(db_session).filter_by(block_id=self.block.id).order_by('event_idx'):
+
+            if identity_audit.type_id == settings.IDENTITY_JUDGEMENT_TYPE_GIVEN:
+
+                judgement = IdentityJudgement.query(db_session).filter_by(
+                    account_id=identity_audit.account_id,
+                    registrar_index=identity_audit.registrar_index
+                ).first()
+
+                if not judgement:
+
+                    judgement = IdentityJudgement(
+                        account_id=identity_audit.account_id,
+                        registrar_index=identity_audit.registrar_index,
+                        created_at_block=self.block.id
+                    )
+
+                judgement.judgement = identity_audit.data['judgement']
+                judgement.updated_at_block = self.block.id
+
+                judgement.save(db_session)
+
+                account = Account.query(db_session).get(identity_audit.account_id)
+
+                if account:
+
+                    if judgement.judgement in ['Reasonable', 'KnownGood']:
+                        account.identity_judgement_good += 1
+
+                    if judgement.judgement in ['LowQuality', 'Erroneous']:
+                        account.identity_judgement_bad += 1
+
+                    account.save(db_session)
+
+                    if account.has_subidentity:
+                        # Update sub identities
+                        sub_accounts = Account.query(db_session).filter_by(parent_identity=account.id)
+                        for sub_account in sub_accounts:
+                            sub_account.identity_judgement_good = account.identity_judgement_good
+                            sub_account.identity_judgement_bad = account.identity_judgement_bad
+                            sub_account.save(db_session)
+
+
+class AccountInfoBlockProcessor(BlockProcessor):
+
+    def accumulation_hook(self, db_session):
+        # Store in AccountInfoSnapshot for all processed search indices and per 10000 blocks
+
+        if self.block.id >= settings.BALANCE_SYSTEM_ACCOUNT_MIN_BLOCK:
+
+            if self.block.id % settings.BALANCE_FULL_SNAPSHOT_INTERVAL == 0:
+                from app.tasks import update_balances_in_block
+
+                if settings.CELERY_RUNNING:
+                    update_balances_in_block.delay(self.block.id)
+                else:
+                    update_balances_in_block(self.block.id)
+            else:
+                # Retrieve unique accounts in all searchindex records for current block
+                for search_index in db_session.query(distinct(SearchIndex.account_id)).filter_by(block_id=self.block.id):
+                    self.harvester.create_balance_snapshot(
+                        block_id=self.block.id,
+                        block_hash=self.block.hash,
+                        account_id=search_index[0]
+                    )
+
+    def sequencing_hook(self, db_session, parent_block, parent_sequenced_block):
+        # Update Account according to AccountInfoSnapshot
+
+        for account_info in AccountInfoSnapshot.query(db_session).filter_by(block_id=self.block.id):
+            account = Account.query(db_session).get(account_info.account_id)
+            if account:
+                account.balance_total = account_info.balance_total
+                account.balance_reserved = account_info.balance_reserved
+                account.balance_free = account_info.balance_free
+                account.nonce = account_info.nonce
+                account.save(db_session)
 
 
 class MarketHistory1mBlockProcessor(BlockProcessor):

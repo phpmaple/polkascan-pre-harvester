@@ -1,6 +1,6 @@
 #  Polkascan PRE Harvester
 #
-#  Copyright 2018-2019 openAware BV (NL).
+#  Copyright 2018-2020 openAware BV (NL).
 #  This file is part of Polkascan.
 #
 #  Polkascan is free software: you can redistribute it and/or modify
@@ -22,11 +22,9 @@
 import dateutil.parser
 import pytz
 
-from app.models.data import DemocracyVoteAudit, RuntimeStorage
+from app import settings
+from app.models.data import IdentityAudit, Account
 from app.processors.base import ExtrinsicProcessor
-from app.settings import DEMOCRACY_VOTE_AUDIT_TYPE_NORMAL, SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION
-from scalecodec import Conviction
-from substrateinterface import SubstrateInterface
 
 
 class TimestampExtrinsicProcessor(ExtrinsicProcessor):
@@ -48,60 +46,295 @@ class DemocracyVoteExtrinsicProcessor(ExtrinsicProcessor):
     module_id = 'democracy'
     call_id = 'vote'
 
-    def accumulation_hook(self, db_session):
+    def process_search_index(self, db_session):
 
         if self.extrinsic.success:
 
-            vote_account_id = self.extrinsic.address
-            stash_account_id = self.extrinsic.address
+            sorting_value = None
 
-            # TODO refactor when new runtime aware substrateinterface
-            # TODO make substrateinterface part of processor over websockets
+            # Try to retrieve balance of vote
+            if self.extrinsic.params[1]['type'] == 'AccountVote<BalanceOf>':
+                if 'Standard' in self.extrinsic.params[1]['value']:
+                    sorting_value = self.extrinsic.params[1]['value']['Standard']['balance']
 
-            # Get balance of stash_account
-            substrate = SubstrateInterface(SUBSTRATE_RPC_URL)
-            storage_call = RuntimeStorage.query(db_session).filter_by(
-                module_id='balances',
-                name='FreeBalance',
-            ).order_by(RuntimeStorage.spec_version.desc()).first()
-
-            stash = substrate.get_storage(
-                block_hash=self.block.hash,
-                module='Balances',
-                function='FreeBalance',
-                params=stash_account_id,
-                return_scale_type=storage_call.type_value,
-                hasher=storage_call.type_hasher,
-                metadata_version=SUBSTRATE_METADATA_VERSION
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_DEMOCRACY_VOTE,
+                account_id=self.extrinsic.address,
+                sorting_value=sorting_value
             )
 
-            vote_audit = DemocracyVoteAudit(
-                block_id=self.extrinsic.block_id,
-                extrinsic_idx=self.extrinsic.extrinsic_idx,
-                type_id=DEMOCRACY_VOTE_AUDIT_TYPE_NORMAL,
-                data={
-                    'vote_account_id': vote_account_id,
-                    'stash_account_id': stash_account_id,
-                    'stash': stash
-                }
+            search_index.save(db_session)
+
+
+class DemocracyProxyVote(ExtrinsicProcessor):
+
+    module_id = 'democracy'
+    call_id = 'proxy_vote'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_DEMOCRACY_PROXY_VOTE,
+                account_id=self.extrinsic.address
             )
 
-            # Process parameters
-            for param in self.extrinsic.params:
-                if param.get('name') == 'ref_index':
-                    vote_audit.democracy_referendum_id = param.get('value')
-                if param.get('name') == 'vote':
-                    vote_audit.data['vote_raw'] = param.get('value')
-                    vote_audit.data['vote_yes'] = bool(vote_audit.data['vote_raw'])
-                    vote_audit.data['vote_no'] = not bool(vote_audit.data['vote_raw'])
-                    # Determine conviction and weight of vote
-                    vote_audit.data['conviction'] = vote_audit.data['vote_raw'] & Conviction.CONVICTION_MASK
-                    vote_audit.data['vote_yes_weighted'] = int(vote_audit.data['vote_yes']) * int(vote_audit.data['stash'] or 0)
-                    vote_audit.data['vote_no_weighted'] = int(vote_audit.data['vote_no']) * int(vote_audit.data['stash'] or 0)
+            search_index.save(db_session)
 
-            vote_audit.save(db_session)
 
-    def accumulation_revert(self, db_session):
-        for item in DemocracyVoteAudit.query(db_session).filter_by(block_id=self.block.id):
-            db_session.delete(item)
+class DemocracySecond(ExtrinsicProcessor):
 
+    module_id = 'democracy'
+    call_id = 'second'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_DEMOCRACY_SECOND,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class IndentitySetSubsExtrinsicProcessor(ExtrinsicProcessor):
+
+    module_id = 'identity'
+    call_id = 'set_subs'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_IDENTITY_SET_SUBS,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class StakingBond(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'bond'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_BONDED,
+                account_id=self.extrinsic.address,
+                sorting_value=self.extrinsic.params[1]['value']
+            )
+
+            search_index.save(db_session)
+
+
+class StakingBondExtra(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'bond_extra'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_BONDED,
+                account_id=self.extrinsic.address,
+                sorting_value=self.extrinsic.params[0]['value']
+            )
+
+            search_index.save(db_session)
+
+
+class StakingUnbond(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'unbond'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_UNBONDED,
+                account_id=self.extrinsic.address,
+                sorting_value=self.extrinsic.params[0]['value']
+            )
+
+            search_index.save(db_session)
+
+
+class StakingWithdrawUnbonded(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'withdraw_unbonded'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_WITHDRAWN,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class StakingNominate(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'nominate'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_NOMINATE,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class StakingValidate(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'validate'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_VALIDATE,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class StakingChill(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'chill'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_CHILL,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class StakingSetPayee(ExtrinsicProcessor):
+
+    module_id = 'staking'
+    call_id = 'set_payee'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_STAKING_SET_PAYEE,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class ElectionsSubmitCandidacy(ExtrinsicProcessor):
+
+    module_id = 'electionsphragmen'
+    call_id = 'submit_candidacy'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_COUNCIL_CANDIDACY_SUBMIT,
+                account_id=self.extrinsic.address
+            )
+
+            search_index.save(db_session)
+
+
+class ElectionsVote(ExtrinsicProcessor):
+
+    module_id = 'electionsphragmen'
+    call_id = 'vote'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_COUNCIL_CANDIDACY_VOTE,
+                account_id=self.extrinsic.address,
+                sorting_value=self.extrinsic.params[1]['value']
+            )
+
+            search_index.save(db_session)
+
+            # Reverse lookup
+            for candidate in self.extrinsic.params[0]['value']:
+                search_index = self.add_search_index(
+                    index_type_id=settings.SEARCH_INDEX_COUNCIL_CANDIDACY_VOTE,
+                    account_id=candidate.replace('0x', ''),
+                    sorting_value=self.extrinsic.params[1]['value']
+                )
+
+                search_index.save(db_session)
+
+
+class TreasuryProposeSpend(ExtrinsicProcessor):
+
+    module_id = 'treasury'
+    call_id = 'propose_spend'
+
+    def process_search_index(self, db_session):
+
+        if self.extrinsic.success:
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_TREASURY_PROPOSED,
+                account_id=self.extrinsic.address,
+                sorting_value=self.extrinsic.params[0]['value']
+            )
+
+            search_index.save(db_session)
+
+            # Add Beneficiary
+
+            search_index = self.add_search_index(
+                index_type_id=settings.SEARCH_INDEX_TREASURY_PROPOSED,
+                account_id=self.extrinsic.params[1]['value'].replace('0x', ''),
+                sorting_value=self.extrinsic.params[0]['value']
+            )
+
+            search_index.save(db_session)
+
+
+class SudoSetKey(ExtrinsicProcessor):
+
+    module_id = 'sudo'
+    call_id = 'set_key'
+
+    def sequencing_hook(self, db_session, parent_block, parent_sequenced_block):
+        if self.extrinsic.success:
+
+            sudo_key = self.extrinsic.params[0]['value'].replace('0x', '')
+
+            Account.query(db_session).filter(
+                Account.id == sudo_key, Account.was_sudo == False
+            ).update({Account.was_sudo: True}, synchronize_session='fetch')
+
+            Account.query(db_session).filter(
+                Account.id != sudo_key, Account.is_sudo == True
+            ).update({Account.is_sudo: False}, synchronize_session='fetch')
+
+            Account.query(db_session).filter(
+                Account.id == sudo_key, Account.is_sudo == False
+            ).update({Account.is_sudo: True}, synchronize_session='fetch')

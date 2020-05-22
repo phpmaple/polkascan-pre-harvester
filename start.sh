@@ -8,9 +8,14 @@ echo "==========================="
 echo "Environment: $ENVIRONMENT"
 echo "==========================="
 
-echo "Wait for database..."
-# Let the DB start
-sleep 10;
+if [ "$ENVIRONMENT" = "prod" ]; then
+  echo "Wait for database..."
+  # Let the DB start
+  sleep 10;
+fi
+
+# Set path
+export PYTHONPATH=$PYTHONPATH:$PWD:$PWD/py-substrate-interface/:$PWD/py-scale-codec/
 
 echo "Running migrations..."
 
@@ -20,9 +25,7 @@ alembic upgrade head
 echo "Running gunicorn..."
 
 if [ "$ENVIRONMENT" = "dev" ]; then
-    # Set path
-    export PYTHONPATH=$PYTHONPATH:./py-substrate-interface/:./py-scale-codec/
-    gunicorn -b 0.0.0.0:8000 --workers=2 app.main:app --reload
+    gunicorn -b 0.0.0.0:8001 --workers=2 app.main:app --reload --timeout 600
 fi
 
 if [ "$ENVIRONMENT" = "prod" ]; then

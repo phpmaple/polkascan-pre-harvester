@@ -1,6 +1,6 @@
 #  Polkascan PRE Harvester
 #
-#  Copyright 2018-2019 openAware BV (NL).
+#  Copyright 2018-2020 openAware BV (NL).
 #  This file is part of Polkascan.
 #
 #  Polkascan is free software: you can redistribute it and/or modify
@@ -71,6 +71,8 @@ class Block(BaseModel):
     full_day = sa.Column(sa.Integer(), nullable=True)
     full_hour = sa.Column(sa.Integer(), nullable=True)
     logs = sa.Column(sa.JSON(), default=None, server_default=None)
+    authority_index = sa.Column(sa.Integer(), nullable=True)
+    slot_number = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
     spec_version_id = sa.Column(sa.String(64), nullable=False)
     debug_info = sa.Column(sa.JSON(), default=None, server_default=None)
 
@@ -121,7 +123,7 @@ class BlockTotal(BaseModel):
     session_id = sa.Column(sa.Integer())
     parent_datetime = sa.Column(sa.DateTime())
     blocktime = sa.Column(sa.Integer(), nullable=False)
-    author = sa.Column(sa.String(64), nullable=True)
+    author = sa.Column(sa.String(64), nullable=True, index=True)
     total_extrinsics = sa.Column(sa.Numeric(
         precision=65, scale=0), nullable=False)
     total_extrinsics_success = sa.Column(
@@ -248,12 +250,47 @@ class Account(BaseModel):
 
     id = sa.Column(sa.String(64), primary_key=True)
     address = sa.Column(sa.String(48), index=True)
+    index_address = sa.Column(sa.String(24), index=True)
     is_reaped = sa.Column(sa.Boolean, default=False)
-    is_validator = sa.Column(sa.Boolean, default=False)
-    is_nominator = sa.Column(sa.Boolean, default=False)
-    is_contract = sa.Column(sa.Boolean, default=False)
+
+    is_validator = sa.Column(sa.Boolean, default=False, index=True)
+    was_validator = sa.Column(sa.Boolean, default=False, index=True)
+    is_nominator = sa.Column(sa.Boolean, default=False, index=True)
+    was_nominator = sa.Column(sa.Boolean, default=False, index=True)
+    is_council_member = sa.Column(sa.Boolean, default=False, index=True)
+    was_council_member = sa.Column(sa.Boolean, default=False, index=True)
+    is_tech_comm_member = sa.Column(sa.Boolean, default=False, index=True)
+    was_tech_comm_member = sa.Column(sa.Boolean, default=False, index=True)
+    is_registrar = sa.Column(sa.Boolean, default=False, index=True)
+    was_registrar = sa.Column(sa.Boolean, default=False, index=True)
+    is_sudo = sa.Column(sa.Boolean, default=False, index=True)
+    was_sudo = sa.Column(sa.Boolean, default=False, index=True)
+
+    is_treasury = sa.Column(sa.Boolean, default=False, index=True)
+    is_contract = sa.Column(sa.Boolean, default=False, index=True)
+
     count_reaped = sa.Column(sa.Integer(), default=0)
-    balance = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    hash_blake2b = sa.Column(sa.String(64), index=True, nullable=True)
+
+    balance_total = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    balance_free = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    balance_reserved = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    nonce = sa.Column(sa.Integer(), nullable=True)
+    account_info = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+
+    has_identity = sa.Column(sa.Boolean, default=False, index=True)
+    has_subidentity = sa.Column(sa.Boolean, default=False, index=True)
+    identity_display = sa.Column(sa.String(32), index=True, nullable=True)
+    identity_legal = sa.Column(sa.String(32), nullable=True)
+    identity_web = sa.Column(sa.String(32), nullable=True)
+    identity_riot = sa.Column(sa.String(32), nullable=True)
+    identity_email = sa.Column(sa.String(32), nullable=True)
+    identity_twitter = sa.Column(sa.String(32), nullable=True)
+    identity_judgement_good = sa.Column(sa.Integer(), default=0)
+    identity_judgement_bad = sa.Column(sa.Integer(), default=0)
+    parent_identity = sa.Column(sa.String(64), index=True, nullable=True)
+    subidentity_display = sa.Column(sa.String(32), nullable=True)
+
     created_at_block = sa.Column(sa.Integer(), nullable=False)
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
@@ -262,13 +299,25 @@ class AccountAudit(BaseModel):
     __tablename__ = 'data_account_audit'
 
     id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    account_id = sa.Column(sa.String(64), primary_key=True)
+    account_id = sa.Column(sa.String(64))
     block_id = sa.Column(sa.Integer(), index=True, nullable=False)
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,server_default=None, nullable=True)
+
+
+class AccountInfoSnapshot(BaseModel):
+    __tablename__ = 'data_account_info_snapshot'
+
+    block_id = sa.Column(sa.Integer(), primary_key=True, index=True)
+    account_id = sa.Column(sa.String(64), primary_key=True, index=True)
+
+    balance_total = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    balance_free = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    balance_reserved = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+    nonce = sa.Column(sa.Integer(), nullable=True)
+    account_info = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
 
 
 class Session(BaseModel):
@@ -348,236 +397,236 @@ class AccountIndexAudit(BaseModel):
     extrinsic_idx = sa.Column(sa.Integer())
     event_idx = sa.Column(sa.Integer())
     type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
+    data = sa.Column(sa.JSON(), default=None,server_default=None, nullable=True)
 
 
-class DemocracyProposal(BaseModel):
-    __tablename__ = 'data_democracy_proposal'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    proposal = sa.Column(sa.JSON(), default=None,
-                         server_default=None, nullable=True)
-    bond = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
-    status = sa.Column(sa.String(64))
 
 
-class DemocracyProposalAudit(BaseModel):
-    __tablename__ = 'data_democracy_proposal_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_proposal_id = sa.Column(sa.Integer(), nullable=False, index=True)
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class DemocracyReferendum(BaseModel):
-    __tablename__ = 'data_democracy_referendum'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    proposal_id = sa.Column(sa.Integer(), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None,
-                         server_default=None, nullable=True)
-    vote_threshold = sa.Column(sa.String(64))
-    success = sa.Column(sa.Boolean(), nullable=True)
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
-    status = sa.Column(sa.String(64))
 
 
-class DemocracyReferendumAudit(BaseModel):
-    __tablename__ = 'data_democracy_referendum_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(
-        sa.Integer(), nullable=False, index=True)
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class DemocracyVote(BaseModel):
-    __tablename__ = 'data_democracy_vote'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(
-        sa.Integer(), nullable=True, index=True)
-    vote_account_id = sa.Column(sa.String(64), index=True, nullable=True)
-    stash_account_id = sa.Column(sa.String(64), index=True, nullable=True)
-    vote_raw = sa.Column(sa.Integer(), nullable=True)
-    vote_yes = sa.Column(sa.Boolean(), nullable=True)
-    vote_no = sa.Column(sa.Boolean(), nullable=True)
-    stash = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
-    conviction = sa.Column(sa.Integer(), nullable=True)
-    vote_yes_weighted = sa.Column(sa.Numeric(
-        precision=65, scale=0), nullable=True)
-    vote_no_weighted = sa.Column(sa.Numeric(
-        precision=65, scale=0), nullable=True)
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
 
-class DemocracyVoteAudit(BaseModel):
-    __tablename__ = 'data_democracy_vote_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    democracy_referendum_id = sa.Column(
-        sa.Integer(), nullable=False, index=True)
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class CouncilMotion(BaseModel):
-    __tablename__ = 'data_council_motion'
-
-    proposal_id = sa.Column(sa.Integer(), primary_key=True)
-    motion_hash = sa.Column(sa.String(64), nullable=False, index=True)
-    account_id = sa.Column(sa.String(64), nullable=True)
-    proposal_hash = sa.Column(sa.String(64), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None,
-                         server_default=None, nullable=True)
-    member_threshold = sa.Column(sa.Integer(), nullable=False)
-    yes_votes_count = sa.Column(sa.Integer(), nullable=False)
-    no_votes_count = sa.Column(sa.Integer(), nullable=False)
-    approved = sa.Column(sa.Boolean(), nullable=True)
-    executed = sa.Column(sa.Boolean(), nullable=True)
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
-    status = sa.Column(sa.String(64))
 
 
-class CouncilMotionAudit(BaseModel):
-    __tablename__ = 'data_council_motion_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    motion_hash = sa.Column(sa.String(64))
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class CouncilVote(BaseModel):
-    __tablename__ = 'data_council_vote'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    proposal_id = sa.Column(sa.Integer(), nullable=True, index=True)
-    motion_hash = sa.Column(sa.String(64), index=True)
-    account_id = sa.Column(sa.String(64), index=True)
-    vote = sa.Column(sa.Boolean())
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
 
-class CouncilVoteAudit(BaseModel):
-    __tablename__ = 'data_council_vote_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    motion_hash = sa.Column(sa.String(64))
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class TreasuryProposal(BaseModel):
-    __tablename__ = 'data_treasury_proposal'
-
-    proposal_id = sa.Column(
-        sa.Integer(), primary_key=True, autoincrement=False)
-    proposed_by_account_id = sa.Column(sa.String(64), nullable=True)
-    value = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
-    beneficiary_account_id = sa.Column(sa.String(64), nullable=True)
-    slash_value = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
-    status = sa.Column(sa.String(64))
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
 
-class TreasuryProposalAudit(BaseModel):
-    __tablename__ = 'data_treasury_proposal_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    proposal_id = sa.Column(sa.Integer(), nullable=False)
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class TechCommProposal(BaseModel):
-    __tablename__ = 'data_techcomm_proposal'
-
-    proposal_id = sa.Column(
-        sa.Integer(), primary_key=True, autoincrement=False)
-    motion_hash = sa.Column(sa.String(64), nullable=False, index=True)
-    account_id = sa.Column(sa.String(64), nullable=True)
-    proposal_hash = sa.Column(sa.String(64), nullable=True)
-    proposal = sa.Column(sa.JSON(), default=None,
-                         server_default=None, nullable=True)
-    member_threshold = sa.Column(sa.Integer(), nullable=False)
-    yes_votes_count = sa.Column(sa.Integer(), nullable=False)
-    no_votes_count = sa.Column(sa.Integer(), nullable=False)
-    approved = sa.Column(sa.Boolean(), nullable=True)
-    executed = sa.Column(sa.Boolean(), nullable=True)
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
-    status = sa.Column(sa.String(64))
 
 
-class TechCommProposalAudit(BaseModel):
-    __tablename__ = 'data_techcomm_proposal_audit'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    motion_hash = sa.Column(sa.String(64))
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    type_id = sa.Column(sa.Integer(), nullable=False)
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
 
 
-class TechCommProposalVote(BaseModel):
-    __tablename__ = 'data_techcomm_proposal_vote'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    proposal_id = sa.Column(sa.Integer(), nullable=True, index=True)
-    motion_hash = sa.Column(sa.String(64), index=True)
-    account_id = sa.Column(sa.String(64), index=True)
-    vote = sa.Column(sa.Boolean())
-    created_at_block = sa.Column(sa.Integer(), nullable=False)
-    updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
 
-class TechCommProposalVoteAudit(BaseModel):
-    __tablename__ = 'data_techcomm_proposal_vote_audit'
 
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
-    motion_hash = sa.Column(sa.String(64))
-    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
-    extrinsic_idx = sa.Column(sa.Integer())
-    event_idx = sa.Column(sa.Integer())
-    data = sa.Column(sa.JSON(), default=None,
-                     server_default=None, nullable=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Contract(BaseModel):
@@ -716,7 +765,7 @@ class RuntimeStorage(BaseModel):
     id = sa.Column(sa.Integer(), primary_key=True)
     spec_version = sa.Column(sa.Integer())
     module_id = sa.Column(sa.String(64))
-    storage_key = sa.Column(sa.String(32))
+    storage_key = sa.Column(sa.String(255))
     index = sa.Column(sa.Integer())
     name = sa.Column(sa.String(255))
     lookup = sa.Column(sa.String(4), index=True)
@@ -767,7 +816,7 @@ class RuntimeErrorMessage(BaseModel):
     documentation = sa.Column(sa.Text())
 
     def serialize_id(self):
-        return '{}-{}-{}'.format(self.spec_version, self.module_id, self.name)
+        return '{}-{}-{}'.format(self.spec_version, self.module_id, self.index)
 
 
 class RuntimeType(BaseModel):
@@ -778,6 +827,8 @@ class RuntimeType(BaseModel):
     spec_version = sa.Column(sa.Integer(), nullable=False)
     type_string = sa.Column(sa.String(255))
     decoder_class = sa.Column(sa.String(255), nullable=True)
+    is_primitive_runtime = sa.Column(sa.Boolean(), default=False)
+    is_primitive_core = sa.Column(sa.Boolean(), default=False)
 
 
 class ReorgBlock(BaseModel):
@@ -824,6 +875,8 @@ class ReorgBlock(BaseModel):
     full_day = sa.Column(sa.Integer(), nullable=True)
     full_hour = sa.Column(sa.Integer(), nullable=True)
     logs = sa.Column(sa.JSON(), default=None, server_default=None)
+    authority_index = sa.Column(sa.Integer(), nullable=True)
+    slot_number = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True)
     spec_version_id = sa.Column(sa.String(64), nullable=False)
     debug_info = sa.Column(sa.JSON(), default=None, server_default=None)
 
@@ -919,7 +972,6 @@ class ReorgLog(BaseModel):
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.log_idx)
 
-
 class Trade(BaseModel):
     __tablename__ = 'data_trade'
     __table_args__ = (
@@ -942,7 +994,6 @@ class Trade(BaseModel):
 
     def serialize_id(self):
         return '{}'.format(self.trade_hash)
-
 
 class Orders(BaseModel):
     __tablename__ = 'data_order'
@@ -1035,3 +1086,58 @@ class MarketHistory_1d(BaseModel):
     quote_amount = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     base = sa.Column(sa.String(66), nullable=False)
     quote = sa.Column(sa.String(66), nullable=False)
+
+
+class IdentityAudit(BaseModel):
+    __tablename__ = 'data_identity_audit'
+
+    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
+    account_id = sa.Column(sa.String(64))
+    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
+    extrinsic_idx = sa.Column(sa.Integer())
+    event_idx = sa.Column(sa.Integer())
+    type_id = sa.Column(sa.Integer(), nullable=False)
+    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+
+
+class IdentityJudgement(BaseModel):
+    __tablename__ = 'data_identity_judgement'
+
+    registrar_index = sa.Column(sa.Integer(), primary_key=True)
+    account_id = sa.Column(sa.String(64), primary_key=True, index=True)
+    judgement = sa.Column(sa.String(32))
+    created_at_block = sa.Column(sa.Integer(), nullable=False)
+    updated_at_block = sa.Column(sa.Integer(), nullable=False)
+
+
+class IdentityJudgementAudit(BaseModel):
+    __tablename__ = 'data_identity_judgement_audit'
+
+    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
+    registrar_index = sa.Column(sa.Integer())
+    account_id = sa.Column(sa.String(64))
+    block_id = sa.Column(sa.Integer(), index=True, nullable=False)
+    extrinsic_idx = sa.Column(sa.Integer())
+    event_idx = sa.Column(sa.Integer())
+    type_id = sa.Column(sa.Integer(), nullable=False)
+    data = sa.Column(sa.JSON(), default=None, server_default=None, nullable=True)
+
+
+class SearchIndexType(BaseModel):
+    __tablename__ = 'data_account_search_index_type'
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    name = sa.Column(sa.String(64), nullable=False, index=True)
+
+
+class SearchIndex(BaseModel):
+    __tablename__ = 'data_account_search_index'
+
+    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=True)
+    block_id = sa.Column(sa.Integer(), nullable=False, index=True)
+    extrinsic_idx = sa.Column(sa.Integer(), nullable=True, index=True)
+    event_idx = sa.Column(sa.Integer(), nullable=True, index=True)
+    account_id = sa.Column(sa.String(64), nullable=True, index=True)
+    index_type_id = sa.Column(sa.Integer(), nullable=False, index=True)
+    sorting_value = sa.Column(sa.Numeric(precision=65, scale=0), nullable=True, index=True)
+
